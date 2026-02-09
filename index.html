@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GiftMarket - P2P Escrow Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-gift"></i>
+                    <span data-i18n="welcomeTitle">GiftMarket</span>
+                </div>
+                <div class="header-info">
+                    <div class="ton-price" id="tonPriceDisplay">
+                        <span data-i18n="tonPrice">TON:</span> $5.50
+                    </div>
+                    <div class="language-switcher">
+                        <button class="lang-btn active" data-lang="ru" onclick="switchLanguage('ru')">RU</button>
+                        <button class="lang-btn" data-lang="en" onclick="switchLanguage('en')">EN</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="main-nav">
+            <div class="nav-container">
+                <div class="nav-item active" data-page="home">
+                    <i class="fas fa-home"></i>
+                    <span data-i18n="navHome">Главная</span>
+                </div>
+                <div class="nav-item" data-page="requisites">
+                    <i class="fas fa-wallet"></i>
+                    <span data-i18n="navRequisites">Реквизиты</span>
+                </div>
+                <div class="nav-item" data-page="orders">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span data-i18n="navOrders">Ордера</span>
+                </div>
+                <div class="nav-item" data-page="profile">
+                    <i class="fas fa-user"></i>
+                    <span data-i18n="navProfile">Профиль</span>
+                </div>
+                <div class="nav-item" data-page="support">
+                    <i class="fas fa-headset"></i>
+                    <span data-i18n="navSupport">Поддержка</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Home Page -->
+            <div id="page-home" class="page active">
+                <div class="page-header">
+                    <h1 data-i18n="welcomeTitle">GiftMarket</h1>
+                    <p data-i18n="welcomeSubtitle">Надежный P2P гарант для ваших сделок</p>
+                </div>
+
+                <!-- Features -->
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon security">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3 data-i18n="featureSecurityTitle">Гарантия безопасности</h3>
+                        <p data-i18n="featureSecurityDesc">Более года на рынке P2P гарантов</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon speed">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h3 data-i18n="featureSpeedTitle">Быстрые транзакции</h3>
+                        <p data-i18n="featureSpeedDesc">Моментальная обработка транзакций</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon commission">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <h3 data-i18n="featureCommissionTitle">Комиссия</h3>
+                        <p data-i18n="featureCommissionDesc">Всего 1% от суммы сделки</p>
+                    </div>
+                </div>
+
+                <!-- Create Order Button -->
+                <div class="create-order-section">
+                    <button id="createOrderBtn" class="btn btn-primary btn-large">
+                        <i class="fas fa-plus-circle"></i>
+                        <span data-i18n="createOrderBtn">Создать ордер</span>
+                    </button>
+                </div>
+
+                <!-- Live Deals -->
+                <div class="live-deals">
+                    <div class="section-header">
+                        <h2 data-i18n="successfulDeals">Успешные сделки</h2>
+                        <div class="live-badge">
+                            <span class="live-dot"></span>
+                            <span>LIVE</span>
+                        </div>
+                    </div>
+                    <div class="deals-container">
+                        <div id="dealsHistory" class="deals-history">
+                            <!-- Deals will be added dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requisites Page -->
+            <div id="page-requisites" class="page">
+                <div class="page-header">
+                    <h1 data-i18n="requisites">Реквизиты</h1>
+                </div>
+
+                <!-- TON Wallet -->
+                <div class="requisite-card">
+                    <div class="requisite-header">
+                        <div class="requisite-title">
+                            <i class="fas fa-gem"></i>
+                            <span data-i18n="tonWalletTitle">TON кошелёк</span>
+                        </div>
+                        <div class="requisite-status">
+                            <span id="tonStatus" class="status inactive" data-i18n="notAdded">Не добавлен</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Display -->
+                    <div id="tonWalletDisplay" style="display: none;">
+                        <div class="requisite-display">
+                            <code id="tonWalletAddress"></code>
+                            <button class="btn btn-secondary btn-small" onclick="editTonWallet()">
+                                <i class="fas fa-edit"></i>
+                                <span data-i18n="edit">Изменить</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Form -->
+                    <div id="tonWalletForm" style="display: block;">
+                        <div class="requisite-form">
+                            <input type="text" id="tonWalletInput" 
+                                   placeholder="UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" 
+                                   class="form-input">
+                            <button class="btn btn-primary btn-small" onclick="saveTonWallet()">
+                                <i class="fas fa-save"></i>
+                                <span data-i18n="save">Сохранить</span>
+                            </button>
+                        </div>
+                        <p class="form-hint" data-i18n="enterTonWallet">
+                            Введите адрес TON кошелька
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Bank Card -->
+                <div class="requisite-card">
+                    <div class="requisite-header">
+                        <div class="requisite-title">
+                            <i class="fas fa-credit-card"></i>
+                            <span data-i18n="bankCardTitle">Банковская карта</span>
+                        </div>
+                        <div class="requisite-status">
+                            <span id="cardStatus" class="status inactive" data-i18n="notAddedFemale">Не добавлена</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Display -->
+                    <div id="cardDisplay" style="display: none;">
+                        <div class="requisite-display">
+                            <span id="cardInfo"></span>
+                            <button class="btn btn-secondary btn-small" onclick="editCard()">
+                                <i class="fas fa-edit"></i>
+                                <span data-i18n="edit">Изменить</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Form -->
+                    <div id="cardForm" style="display: block;">
+                        <div class="requisite-form-grid">
+                            <input type="text" id="cardNumberInput" 
+                                   placeholder="0000 0000 0000 0000" 
+                                   class="form-input" data-i18n-placeholder="cardNumber">
+                            <input type="text" id="cardBankInput" 
+                                   placeholder="Сбербанк" 
+                                   class="form-input" data-i18n-placeholder="bankName">
+                            <select id="cardCurrencyInput" class="form-input">
+                                <option value="RUB" data-i18n="RUB">RUB</option>
+                                <option value="USD" data-i18n="USD">USD</option>
+                                <option value="EUR" data-i18n="EUR">EUR</option>
+                                <option value="KZT" data-i18n="KZT">KZT</option>
+                                <option value="UAH" data-i18n="UAH">UAH</option>
+                            </select>
+                            <button class="btn btn-primary btn-small" onclick="saveCard()">
+                                <i class="fas fa-save"></i>
+                                <span data-i18n="save">Сохранить</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Telegram -->
+                <div class="requisite-card">
+                    <div class="requisite-header">
+                        <div class="requisite-title">
+                            <i class="fab fa-telegram"></i>
+                            <span data-i18n="telegramTitle">Telegram</span>
+                        </div>
+                        <div class="requisite-status">
+                            <span id="telegramStatus" class="status inactive" data-i18n="notAdded">Не добавлен</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Display -->
+                    <div id="telegramDisplay" style="display: none;">
+                        <div class="requisite-display">
+                            <span id="telegramUsername"></span>
+                            <button class="btn btn-secondary btn-small" onclick="editTelegram()">
+                                <i class="fas fa-edit"></i>
+                                <span data-i18n="edit">Изменить</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Form -->
+                    <div id="telegramForm" style="display: block;">
+                        <div class="requisite-form">
+                            <input type="text" id="telegramInput" 
+                                   placeholder="@username" 
+                                   class="form-input">
+                            <button class="btn btn-primary btn-small" onclick="saveTelegram()">
+                                <i class="fas fa-save"></i>
+                                <span data-i18n="save">Сохранить</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Page -->
+            <div id="page-orders" class="page">
+                <div class="page-header">
+                    <h1 data-i18n="myOrders">Мои ордера</h1>
+                </div>
+
+                <!-- No Orders State -->
+                <div id="ordersListContainer" style="display: none;">
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <i class="fas fa-shopping-cart"></i>
+                        </div>
+                        <h3 data-i18n="noOrdersTitle">У вас пока нет ордеров</h3>
+                        <p data-i18n="noOrdersDesc">Создайте свой первый ордер</p>
+                        <button id="createOrderBtn2" class="btn btn-primary" onclick="showCreateOrderForm()">
+                            <i class="fas fa-plus"></i>
+                            <span data-i18n="createNewOrder">Создать новый ордер</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Orders List -->
+                <div id="ordersList" class="orders-list" style="display: none;">
+                    <!-- Orders will be added dynamically -->
+                </div>
+
+                <!-- Create Order Form -->
+                <div id="createOrderForm" class="create-order-form" style="display: none;">
+                    <div class="form-header">
+                        <h2 data-i18n="orderCreation">Создание ордера</h2>
+                        <button class="btn btn-icon" onclick="cancelOrderCreation()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <!-- Step 1: Deal Type -->
+                    <div id="step1" class="form-step">
+                        <h3 data-i18n="dealType">Тип сделки</h3>
+                        <div class="options-grid">
+                            <div class="option-item" data-type="nft_gift">
+                                <div class="option-icon">
+                                    <i class="fas fa-gift"></i>
+                                </div>
+                                <h4 data-i18n="nftGift">Продажа NFT подарка</h4>
+                                <p>Продажа подарков из каталога Telegram</p>
+                            </div>
+                            <div class="option-item" data-type="nft_username">
+                                <div class="option-icon">
+                                    <i class="fas fa-at"></i>
+                                </div>
+                                <h4 data-i18n="nftUsername">Продажа NFT username</h4>
+                                <p>Продажа username аккаунтов Telegram</p>
+                            </div>
+                            <div class="option-item" data-type="nft_number">
+                                <div class="option-icon">
+                                    <i class="fas fa-hashtag"></i>
+                                </div>
+                                <h4 data-i18n="nftNumber">Продажа NFT number</h4>
+                                <p>Продажа номерных аккаунтов Telegram</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Payment Method -->
+                    <div id="step2" class="form-step" style="display: none;">
+                        <div class="form-step-header">
+                            <button class="btn btn-icon" onclick="previousStep(1)">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <h3 data-i18n="paymentMethod">Способ оплаты</h3>
+                        </div>
+                        <div class="options-grid">
+                            <div class="option-item" data-payment="ton">
+                                <div class="option-icon">
+                                    <i class="fas fa-gem"></i>
+                                </div>
+                                <h4 data-i18n="tonWallet">TON кошелёк</h4>
+                                <p>Оплата криптовалютой TON</p>
+                            </div>
+                            <div class="option-item" data-payment="card">
+                                <div class="option-icon">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <h4 data-i18n="bankCard">Банковская карта</h4>
+                                <p>Оплата банковской картой</p>
+                            </div>
+                            <div class="option-item" data-payment="stars">
+                                <div class="option-icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <h4 data-i18n="telegramStars">Telegram Stars</h4>
+                                <p>Оплата Telegram Stars</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Step 3: Order Details -->
+                    <div id="step3" class="form-step" style="display: none;">
+                        <div class="form-step-header">
+                            <button class="btn btn-icon" onclick="previousStep(2)">
+                                <i class="fas fa-arrow-left"></i>
+                            </button>
+                            <h3 data-i18n="orderDetails">Детали ордера</h3>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label data-i18n="dealAmount">Сумма сделки</label>
+                            <input type="number" id="orderAmount" 
+                                   placeholder="1000" 
+                                   class="form-input" data-i18n-placeholder="enterAmount">
+                            <p class="form-hint">Введите сумму в выбранной валюте</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label data-i18n="description">Описание</label>
+                            <textarea id="orderDescription" 
+                                      rows="3" 
+                                      placeholder="Опишите предмет сделки..." 
+                                      class="form-input" data-i18n-placeholder="describeItem"></textarea>
+                        </div>
+                        
+                        <button id="createOrderSubmit" class="btn btn-primary btn-large btn-full">
+                            <i class="fas fa-check"></i>
+                            <span data-i18n="create">Создать</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Page -->
+            <div id="page-profile" class="page">
+                <div class="page-header">
+                    <h1 data-i18n="profile">Профиль</h1>
+                </div>
+
+                <!-- Stats -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-handshake"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 data-i18n="completedDeals">Завершено сделок</h3>
+                            <div class="stat-value" id="completedDeals">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-content">
+                            <h3 data-i18n="totalVolume">Общий оборот</h3>
+                            <div class="stat-value" id="totalVolume">$0.00</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Volume by Currency -->
+                <div class="section-card">
+                    <h3 data-i18n="volumeByCurrency">Оборот по валютам</h3>
+                    <div id="currencyStats" class="currency-stats">
+                        <p class="empty-text" data-i18n="noData">Нет данных</p>
+                    </div>
+                </div>
+
+                <!-- Admin Panel (hidden by default) -->
+                <div id="adminPanel" class="admin-panel" style="display: none;">
+                    <h3 data-i18n="adminPanel">Панель администратора</h3>
+                    
+                    <div class="form-group">
+                        <label data-i18n="dealsCount">Количество сделок</label>
+                        <div class="input-with-button">
+                            <input type="number" id="adminDealsInput" class="form-input" value="0">
+                            <button class="btn btn-secondary" onclick="updateDealsCount()" data-i18n="update">Обновить</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label data-i18n="addVolume">Добавить оборот</label>
+                        <div class="input-with-button">
+                            <input type="text" id="adminVolumeInput" class="form-input" placeholder="USD:100">
+                            <button class="btn btn-secondary" onclick="addVolume()" data-i18n="add">Добавить</button>
+                        </div>
+                        <p class="form-hint">Формат: Валюта:Сумма (например: USD:100)</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Support Page -->
+            <div id="page-support" class="page">
+                <div class="page-header">
+                    <h1 data-i18n="support">Поддержка</h1>
+                </div>
+
+                <div class="support-grid">
+                    <div class="support-card">
+                        <div class="support-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <h3 data-i18n="workingHours">Часы работы</h3>
+                        <div data-i18n-html="workingHoursText" class="support-content">
+                            Ежедневно<br>с 6:00 до 22:00 UTC+3
+                        </div>
+                    </div>
+                    
+                    <div class="support-card">
+                        <div class="support-icon">
+                            <i class="fas fa-headset"></i>
+                        </div>
+                        <h3 data-i18n="supportService">Служба поддержки</h3>
+                        <div class="support-content">
+                            <p><strong>Telegram:</strong></p>
+                            <p><a href="https://t.me/GiftMarketEscrow" target="_blank">@GiftMarketEscrow</a></p>
+                            <p><a href="https://t.me/GiftMarketSupport" target="_blank">@GiftMarketSupport</a></p>
+                        </div>
+                    </div>
+                    
+                    <div class="support-card">
+                        <div class="support-icon">
+                            <i class="fas fa-user-shield"></i>
+                        </div>
+                        <h3 data-i18n="escrowAccount">Эскроу аккаунт</h3>
+                        <div class="support-content">
+                            <p data-i18n="escrowAccountText">Аккаунт для передачи активов:</p>
+                            <p><strong>@GiftMarketEscrow</strong></p>
+                            <p class="support-note">
+                                Все активы передаются через этот аккаунт для обеспечения безопасности сделки
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="support-info">
+                    <h3>Как работает гарант?</h3>
+                    <ol>
+                        <li>Продавец создает ордер с указанием реквизитов</li>
+                        <li>Покупатель присоединяется к ордеру и оплачивает сделку</li>
+                        <li>Продавец передает актив эскроу аккаунту @GiftMarketEscrow</li>
+                        <li>После подтверждения получения, покупатель завершает сделку</li>
+                        <li>Деньги переводятся продавцу, актив - покупателю</li>
+                    </ol>
+                </div>
+            </div>
+        </main>
+
+        <!-- Modals -->
+        <div id="modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modalTitle"></h3>
+                    <button class="btn btn-icon" onclick="closeModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="modalBody" class="modal-body"></div>
+            </div>
+        </div>
+
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
+    </div>
+
+    <script src="translations.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
