@@ -168,10 +168,10 @@
                         <div class="requisite-form-grid">
                             <input type="text" id="cardNumberInput" 
                                    placeholder="0000 0000 0000 0000" 
-                                   class="form-input" data-i18n-placeholder="cardNumber">
+                                   class="form-input">
                             <input type="text" id="cardBankInput" 
                                    placeholder="Сбербанк" 
-                                   class="form-input" data-i18n-placeholder="bankName">
+                                   class="form-input">
                             <select id="cardCurrencyInput" class="form-input">
                                 <option value="RUB" data-i18n="RUB">RUB</option>
                                 <option value="USD" data-i18n="USD">USD</option>
@@ -237,7 +237,7 @@
                         </div>
                         <h3 data-i18n="noOrdersTitle">У вас пока нет ордеров</h3>
                         <p data-i18n="noOrdersDesc">Создайте свой первый ордер</p>
-                        <button id="createOrderBtn2" class="btn btn-primary" onclick="showCreateOrderForm()">
+                        <button id="createOrderBtn2" class="btn btn-primary">
                             <i class="fas fa-plus"></i>
                             <span data-i18n="createNewOrder">Создать новый ордер</span>
                         </button>
@@ -332,7 +332,7 @@
                             <label data-i18n="dealAmount">Сумма сделки</label>
                             <input type="number" id="orderAmount" 
                                    placeholder="1000" 
-                                   class="form-input" data-i18n-placeholder="enterAmount">
+                                   class="form-input">
                             <p class="form-hint">Введите сумму в выбранной валюте</p>
                         </div>
                         
@@ -341,7 +341,7 @@
                             <textarea id="orderDescription" 
                                       rows="3" 
                                       placeholder="Опишите предмет сделки..." 
-                                      class="form-input" data-i18n-placeholder="describeItem"></textarea>
+                                      class="form-input"></textarea>
                         </div>
                         
                         <button id="createOrderSubmit" class="btn btn-primary btn-large btn-full">
@@ -465,7 +465,7 @@
                             <i class="fas fa-clock"></i>
                         </div>
                         <h3 data-i18n="workingHours">Часы работы</h3>
-                        <div data-i18n-html="workingHoursText" class="support-content">
+                        <div class="support-content">
                             Ежедневно<br>с 6:00 до 22:00 UTC+3
                         </div>
                     </div>

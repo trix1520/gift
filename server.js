@@ -249,8 +249,7 @@ app.post('/api/orders', (req, res) => {
         payment_method,
         amount,
         currency,
-        description,
-        seller_requisites
+        description
     } = req.body;
     
     const seller = users.find(u => u.telegram_id === seller_telegram_id);
@@ -285,7 +284,7 @@ app.post('/api/orders', (req, res) => {
         amount: parseFloat(amount),
         currency,
         description,
-        seller_requisites: seller_requisites || getSellerRequisites(seller, payment_method),
+        seller_requisites: getSellerRequisites(seller, payment_method),
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),

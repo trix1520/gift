@@ -63,17 +63,17 @@ const translations = {
         added: "Добавлен",
         addedFemale: "Добавлена",
         
-        tonWalletTitle: "💎 TON кошелёк",
+        tonWalletTitle: "TON кошелёк",
         enterTonWallet: "Введите адрес TON кошелька",
         save: "Сохранить",
         edit: "Изменить",
         
-        bankCardTitle: "💳 Банковская карта",
+        bankCardTitle: "Банковская карта",
         cardNumber: "Номер карты",
         bankName: "Название банка",
         selectCurrency: "Выберите валюту",
         
-        telegramTitle: "⭐ Telegram",
+        telegramTitle: "Telegram",
         
         // Profile page
         profile: "Профиль",
@@ -83,7 +83,7 @@ const translations = {
         noData: "Нет данных",
         
         // Admin panel
-        adminPanel: "🔧 Панель администратора",
+        adminPanel: "Панель администратора",
         dealsCount: "Количество сделок",
         update: "Обновить",
         addVolume: "Добавить оборот",
@@ -130,7 +130,7 @@ const translations = {
         cancel: "Отмена",
         confirm: "Подтвердить",
         
-        dealCompletedTitle: "🎉 Сделка успешно завершена!",
+        dealCompletedTitle: "Сделка успешно завершена!",
         thankYou: "Благодарим за использование GiftMarket!",
         orderNumber: "Номер сделки:",
         dealCompletedText: "Ваша сделка успешно завершена и учтена в статистике. Спасибо за доверие к нашему сервису безопасных транзакций!",
@@ -184,7 +184,14 @@ const translations = {
         paymentReceived: "Оплата получена",
         buyerJoined: "присоединился к ордеру",
         paymentConfirmedNotif: "подтвердил оплату ордера",
-        dealCompletedNotif: "успешно завершен"
+        dealCompletedNotif: "успешно завершен",
+        
+        // Currency codes
+        RUB: "RUB",
+        USD: "USD",
+        EUR: "EUR",
+        KZT: "KZT",
+        UAH: "UAH"
     },
     
     en: {
@@ -250,17 +257,17 @@ const translations = {
         added: "Added",
         addedFemale: "Added",
         
-        tonWalletTitle: "💎 TON Wallet",
+        tonWalletTitle: "TON Wallet",
         enterTonWallet: "Enter TON wallet address",
         save: "Save",
         edit: "Edit",
         
-        bankCardTitle: "💳 Bank Card",
+        bankCardTitle: "Bank Card",
         cardNumber: "Card number",
         bankName: "Bank name",
         selectCurrency: "Select currency",
         
-        telegramTitle: "⭐ Telegram",
+        telegramTitle: "Telegram",
         
         // Profile page
         profile: "Profile",
@@ -270,7 +277,7 @@ const translations = {
         noData: "No data",
         
         // Admin panel
-        adminPanel: "🔧 Admin Panel",
+        adminPanel: "Admin Panel",
         dealsCount: "Deals Count",
         update: "Update",
         addVolume: "Add Volume",
@@ -317,7 +324,7 @@ const translations = {
         cancel: "Cancel",
         confirm: "Confirm",
         
-        dealCompletedTitle: "🎉 Deal Successfully Completed!",
+        dealCompletedTitle: "Deal Successfully Completed!",
         thankYou: "Thank you for using GiftMarket!",
         orderNumber: "Deal number:",
         dealCompletedText: "Your deal has been successfully completed and recorded in statistics. Thank you for trusting our secure transaction service!",
@@ -371,7 +378,14 @@ const translations = {
         paymentReceived: "Payment Received",
         buyerJoined: "joined the order",
         paymentConfirmedNotif: "confirmed payment for order",
-        dealCompletedNotif: "successfully completed"
+        dealCompletedNotif: "successfully completed",
+        
+        // Currency codes
+        RUB: "RUB",
+        USD: "USD",
+        EUR: "EUR",
+        KZT: "KZT",
+        UAH: "UAH"
     }
 };
 
@@ -381,15 +395,6 @@ let currentLanguage = localStorage.getItem('language') || 'ru';
 // Функция для получения перевода
 function t(key) {
     return translations[currentLanguage][key] || key;
-}
-
-// Функция для смены языка
-function setLanguage(lang) {
-    if (translations[lang]) {
-        currentLanguage = lang;
-        localStorage.setItem('language', lang);
-        updatePageTranslations();
-    }
 }
 
 // Функция для обновления всех переводов на странице

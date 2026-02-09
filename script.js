@@ -361,7 +361,6 @@ function showCreateOrderForm() {
     document.getElementById('createOrderForm')?.classList.remove('hidden');
     
     resetOrderForm();
-    showPage('orders');
 }
 
 function cancelOrderCreation() {
