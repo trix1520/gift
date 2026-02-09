@@ -1131,3 +1131,133 @@ textarea.form-input {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--gray-400);
 }
+
+/* Добавить в конец файла */
+
+/* Стили для воркер панели */
+.worker-panel {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.worker-order-card {
+    transition: transform 0.2s ease;
+    cursor: pointer;
+}
+
+.worker-order-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.worker-stats {
+    border: 2px solid #ffc107;
+}
+
+/* Стили для админ панели */
+.admin-section {
+    background: white;
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--gray-200);
+}
+
+.admin-section h4 {
+    color: var(--gray-800);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-section h4 i {
+    color: var(--primary);
+}
+
+.admin-list {
+    background: var(--gray-50);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+}
+
+.admin-user-card, .admin-worker-card {
+    transition: all 0.3s ease;
+}
+
+.admin-user-card:hover, .admin-worker-card:hover {
+    background: white !important;
+    box-shadow: var(--shadow);
+}
+
+.add-worker-form {
+    background: var(--gray-50);
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    border: 1px dashed var(--gray-300);
+}
+
+.add-worker-form h5 {
+    color: var(--gray-700);
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+/* Статусы ордеров для воркеров */
+.status-fake-payment {
+    background: #d4edda;
+    color: #155724;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.status-fast-complete {
+    background: #cce5ff;
+    color: #004085;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+/* Кнопки воркеров */
+.btn-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+    color: white;
+    border: none;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+/* Анимация для быстрых действий */
+@keyframes flash {
+    0% { background-color: transparent; }
+    50% { background-color: rgba(255, 193, 7, 0.2); }
+    100% { background-color: transparent; }
+}
+
+.fast-action {
+    animation: flash 1s ease;
+}
+
+/* Адаптивность */
+@media (max-width: 400px) {
+    .worker-order-card {
+        padding: 10px;
+    }
+    
+    .admin-section {
+        padding: 15px;
+    }
+    
+    .add-worker-form {
+        padding: 12px;
+    }
+}
