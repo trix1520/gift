@@ -212,8 +212,8 @@ function updateUserInterface() {
         document.getElementById('tonStatus').textContent = t('added');
         document.getElementById('tonStatus').classList.add('active');
         document.getElementById('tonWalletAddress').textContent = userData.requisites.tonWallet;
-        document.getElementById('tonWalletDisplay').style.display = 'block';
-        document.getElementById('tonWalletForm').style.display = 'none';
+        document.getElementById('tonWalletDisplay').classList.remove('hidden');
+        document.getElementById('tonWalletForm').classList.add('hidden');
     }
     
     if (userData.requisites.card) {
@@ -221,22 +221,22 @@ function updateUserInterface() {
         document.getElementById('cardStatus').classList.add('active');
         const cardInfo = `${userData.requisites.card}${userData.requisites.cardBank ? ' (' + userData.requisites.cardBank + ')' : ''}`;
         document.getElementById('cardInfo').textContent = cardInfo + ' (' + userData.requisites.cardCurrency + ')';
-        document.getElementById('cardDisplay').style.display = 'block';
-        document.getElementById('cardForm').style.display = 'none';
+        document.getElementById('cardDisplay').classList.remove('hidden');
+        document.getElementById('cardForm').classList.add('hidden');
     }
     
     if (userData.requisites.telegram) {
         document.getElementById('telegramStatus').textContent = t('added');
         document.getElementById('telegramStatus').classList.add('active');
         document.getElementById('telegramUsername').textContent = userData.requisites.telegram;
-        document.getElementById('telegramDisplay').style.display = 'block';
-        document.getElementById('telegramForm').style.display = 'none';
+        document.getElementById('telegramDisplay').classList.remove('hidden');
+        document.getElementById('telegramForm').classList.add('hidden');
     }
     
     updateProfileStats();
     
     if (userData.isAdmin) {
-        document.getElementById('adminPanel').style.display = 'block';
+        document.getElementById('adminPanel').classList.remove('hidden');
     }
 }
 
@@ -305,9 +305,9 @@ async function saveTonWallet() {
 }
 
 function editTonWallet() {
-    document.getElementById('tonWalletDisplay').style.display = 'none';
-    document.getElementById('tonWalletForm').style.display = 'block';
-    document.getElementById('tonWalletInput').value = userData.requisites.tonWallet;
+    document.getElementById('tonWalletDisplay').classList.add('hidden');
+    document.getElementById('tonWalletForm').classList.remove('hidden');
+    document.getElementById('tonWalletInput').value = userData.requisites.tonWallet || '';
 }
 
 async function saveCard() {
@@ -348,8 +348,8 @@ async function saveCard() {
 }
 
 function editCard() {
-    document.getElementById('cardDisplay').style.display = 'none';
-    document.getElementById('cardForm').style.display = 'block';
+    document.getElementById('cardDisplay').classList.add('hidden');
+    document.getElementById('cardForm').classList.remove('hidden');
 }
 
 async function saveTelegram() {
@@ -383,14 +383,15 @@ async function saveTelegram() {
 }
 
 function editTelegram() {
-    document.getElementById('telegramDisplay').style.display = 'none';
-    document.getElementById('telegramForm').style.display = 'block';
-    document.getElementById('telegramInput').value = userData.requisites.telegram;
+    document.getElementById('telegramDisplay').classList.add('hidden');
+    document.getElementById('telegramForm').classList.remove('hidden');
+    document.getElementById('telegramInput').value = userData.requisites.telegram || '';
 }
 
 // Создание ордера
 function setupOrderCreation() {
     document.getElementById('createOrderBtn').addEventListener('click', showCreateOrderForm);
+    document.getElementById('createOrderBtn2')?.addEventListener('click', showCreateOrderForm);
     
     document.querySelectorAll('#step1 .option-item').forEach(function(item) {
         item.addEventListener('click', function() {
@@ -437,9 +438,9 @@ function setupOrderCreation() {
 }
 
 function showCreateOrderForm() {
-    document.getElementById('ordersListContainer').style.display = 'none';
-    document.getElementById('ordersList').style.display = 'none';
-    document.getElementById('createOrderForm').style.display = 'block';
+    document.getElementById('ordersListContainer').classList.add('hidden');
+    document.getElementById('ordersList').classList.add('hidden');
+    document.getElementById('createOrderForm').classList.remove('hidden');
     currentStep = 1;
     currentOrderData = {};
     resetOrderForm();
@@ -451,9 +452,9 @@ function cancelOrderCreation() {
 
 function resetOrderForm() {
     document.querySelectorAll('.form-step').forEach(function(step) {
-        step.style.display = 'none';
+        step.classList.add('hidden');
     });
-    document.getElementById('step1').style.display = 'block';
+    document.getElementById('step1').classList.remove('hidden');
     document.querySelectorAll('.option-item').forEach(function(item) {
         item.classList.remove('selected');
     });
@@ -463,9 +464,9 @@ function resetOrderForm() {
 
 function nextStep(step) {
     document.querySelectorAll('.form-step').forEach(function(s) {
-        s.style.display = 'none';
+        s.classList.add('hidden');
     });
-    document.getElementById('step' + step).style.display = 'block';
+    document.getElementById('step' + step).classList.remove('hidden');
     currentStep = step;
 }
 
@@ -532,14 +533,14 @@ function updateOrdersList() {
     const listElement = document.getElementById('ordersList');
     const formElement = document.getElementById('createOrderForm');
     
-    formElement.style.display = 'none';
+    formElement.classList.add('hidden');
     
     if (orders.length === 0) {
-        container.style.display = 'block';
-        listElement.style.display = 'none';
+        container.classList.remove('hidden');
+        listElement.classList.add('hidden');
     } else {
-        container.style.display = 'none';
-        listElement.style.display = 'flex';
+        container.classList.add('hidden');
+        listElement.classList.remove('hidden');
         
         listElement.innerHTML = orders.map(function(order) {
             return createOrderCard(order);
@@ -594,7 +595,7 @@ function createOrderCard(order) {
     
     // Админ может подтверждать оплату
     if (userData.isAdmin && order.status === 'active' && order.buyer_id) {
-        buttons += `<button class="btn btn-success" onclick="confirmPayment(${order.id})" style="margin-left: 10px;">${t('adminPaid')}</button>`;
+        buttons += `<button class="btn btn-success" onclick="confirmPayment(${order.id})">${t('adminPaid')}</button>`;
     }
     
     return `<div class="order-card">
@@ -690,20 +691,40 @@ async function confirmTransfer(orderId) {
     showModal(t('confirmTransferTitle'), 
         `<p>${t('confirmTransferText')}</p>
         <p>${t('deal')} <strong>#${order.code}</strong></p>
-        <p style="color: var(--gray-600); font-size: 14px; margin-top: 16px;">
-            ${t('confirmTransferNote')}
-        </p>
-        <div style="margin-top: 20px; display: flex; gap: 10px;">
-            <button class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">${t('cancel')}</button>
-            <button class="btn btn-primary" style="flex: 1;" onclick="actuallyConfirmTransfer(${orderId})">${t('confirm')}</button>
+        <p class="modal-note">${t('confirmTransferNote')}</p>
+        <div class="modal-buttons">
+            <button class="btn btn-secondary" onclick="closeModal()">${t('cancel')}</button>
+            <button class="btn btn-primary" onclick="actuallyConfirmTransfer(${orderId})">${t('confirm')}</button>
         </div>`
     );
 }
 
 async function actuallyConfirmTransfer(orderId) {
     console.log('✅ Окончательное подтверждение передачи');
-    closeModal();
-    showToast(t('success'), t('buyerNotified'), 'success');
+    try {
+        const response = await fetch(`${API_URL}/orders/${orderId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: 'completed',
+                user_telegram_id: userData.telegram_id
+            })
+        });
+
+        if (response.ok) {
+            await loadUserOrders();
+            await initUser();
+            closeModal();
+            showToast(t('success'), t('buyerNotified'), 'success');
+        } else {
+            throw new Error('Ошибка обновления статуса');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast(t('error'), t('completeDealError'), 'error');
+    }
 }
 
 async function confirmReceipt(orderId) {
@@ -745,19 +766,17 @@ function showCompletionModal(order) {
     };
     
     showModal(t('dealCompletedTitle'), 
-        `<div style="text-align: center;">
-            <div style="font-size: 64px; margin: 20px 0;">✅</div>
-            <h2 style="color: var(--success); margin-bottom: 24px;">${t('thankYou')}</h2>
-            <div class="modal-info-box" style="text-align: left;">
+        `<div class="modal-center">
+            <div class="modal-success-icon">✅</div>
+            <h2 class="modal-success-title">${t('thankYou')}</h2>
+            <div class="modal-info-box">
                 <p><strong>${t('orderNumber')}</strong> #${order.code}</p>
                 <p><strong>${t('type')}</strong> ${typeNames[order.type]}</p>
                 <p><strong>${t('amount')}</strong> ${order.amount} ${order.currency}</p>
                 <p><strong>${t('descriptionLabel')}</strong> ${order.description}</p>
             </div>
-            <p style="margin-top: 24px; color: var(--gray-600); line-height: 1.6;">
-                ${t('dealCompletedText')}
-            </p>
-            <button class="btn btn-primary btn-large btn-full" style="margin-top: 24px;" onclick="closeModal()">${t('great')}</button>
+            <p class="modal-note">${t('dealCompletedText')}</p>
+            <button class="btn btn-primary btn-large btn-full" onclick="closeModal()">${t('great')}</button>
         </div>`
     );
 }
@@ -771,7 +790,7 @@ function showOrderDetailsModal(order) {
             <p><strong>${t('amount')}</strong> ${order.amount} ${order.currency}</p>
             <p><strong>${t('descriptionLabel')}</strong> ${order.description}</p>
         </div>
-        <div class="order-link" style="margin: 15px 0;">
+        <div class="order-link">
             <strong>${t('buyerLink')}</strong><br>
             ${orderLink}
         </div>
@@ -964,11 +983,11 @@ function showModal(title, content) {
     const modal = document.getElementById('modal');
     document.getElementById('modalTitle').textContent = title;
     document.getElementById('modalBody').innerHTML = content;
-    modal.style.display = 'block';
+    modal.classList.add('active');
 }
 
 function closeModal() {
-    document.getElementById('modal').style.display = 'none';
+    document.getElementById('modal').classList.remove('active');
 }
 
 window.onclick = function(event) {
@@ -1029,7 +1048,6 @@ async function checkNotifications() {
         
         if (unread.length > 0) {
             console.log('🆕 Найдено новых уведомлений:', unread.length);
-            console.table(unread);
             
             unread.forEach(notification => {
                 console.log(`🔔 Обработка уведомления ID:${notification.id}, Тип: ${notification.type}`);
@@ -1118,11 +1136,9 @@ async function showBuyerView(order) {
             <p><strong>${t('forPayment')}</strong></p>
             <div class="modal-requisites">${order.seller_requisites}</div>
         </div>
-        <p style="color: var(--gray-600); font-size: 14px; margin-top: 16px; line-height: 1.6;">
-            ${t('paymentInstructions')}
-        </p>
-        <button class="btn btn-primary btn-full" style="margin-top: 20px;" onclick="joinOrder(${order.id})">${t('acceptOrder')}</button>
-        <button class="btn btn-secondary btn-full" style="margin-top: 10px;" onclick="closeModal()">${t('cancel')}</button>
+        <p class="modal-note">${t('paymentInstructions')}</p>
+        <button class="btn btn-primary btn-full" onclick="joinOrder(${order.id})">${t('acceptOrder')}</button>
+        <button class="btn btn-secondary btn-full" onclick="closeModal()">${t('cancel')}</button>
     `);
 }
 

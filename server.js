@@ -1,11 +1,36 @@
 // server.js - API эмуляция для Render
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
+const fs = require('fs');
 const app = express();
 
-// Middleware
+// Middleware для настройки CSP заголовков
+app.use((req, res, next) => {
+    // Разрешаем все для демонстрации (не для продакшена!)
+    res.setHeader('Content-Security-Policy', 
+        "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+        "script-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
+        "style-src * 'unsafe-inline' 'unsafe-eval'; " +
+        "img-src * data: blob:; " +
+        "font-src * data:; " +
+        "connect-src *; " +
+        "frame-src *; " +
+        "media-src *;"
+    );
+    next();
+});
+
 app.use(cors());
 app.use(express.json());
+
+// Статические файлы
+app.use(express.static(__dirname));
+
+// Serve favicon
+app.get('/favicon.ico', (req, res) => {
+    res.sendFile(path.join(__dirname, 'favicon.ico'));
+});
 
 // Имитация базы данных
 let users = [];
@@ -19,7 +44,7 @@ let notificationCounter = 1;
 
 // Получить курс TON
 app.get('/api/ton-price', (req, res) => {
-    const tonPrice = Math.random() * 0.5 + 5.0; // Имитация реального курса
+    const tonPrice = Math.random() * 0.5 + 5.0;
     res.json({ price: tonPrice.toFixed(2) });
 });
 
@@ -27,7 +52,6 @@ app.get('/api/ton-price', (req, res) => {
 app.post('/api/users', (req, res) => {
     const { username, telegram_id } = req.body;
     
-    // Проверяем, существует ли пользователь
     let user = users.find(u => u.telegram_id === telegram_id);
     
     if (!user) {
@@ -161,7 +185,6 @@ app.post('/api/orders/:id/join', (req, res) => {
     order.buyer_telegram_id = buyer_telegram_id;
     order.updated_at = new Date().toISOString();
     
-    // Уведомление для продавца
     createNotification(
         order.seller_telegram_id,
         'buyer_joined',
@@ -188,7 +211,6 @@ app.put('/api/orders/:id/status', (req, res) => {
         return res.status(400).json({ error: 'User not found' });
     }
     
-    // Проверяем права
     if (user.id !== order.seller_id && user.id !== order.buyer_id && !user.isAdmin) {
         return res.status(403).json({ error: 'Access denied' });
     }
@@ -196,7 +218,6 @@ app.put('/api/orders/:id/status', (req, res) => {
     order.status = status;
     order.updated_at = new Date().toISOString();
     
-    // Создаем уведомления
     if (status === 'paid') {
         createNotification(
             order.seller_telegram_id,
@@ -210,7 +231,6 @@ app.put('/api/orders/:id/status', (req, res) => {
             `Сделка #${order.code} успешно завершена`
         );
         
-        // Обновляем статистику пользователей
         const seller = users.find(u => u.telegram_id === order.seller_telegram_id);
         const buyer = users.find(u => u.telegram_id === order.buyer_telegram_id);
         
@@ -277,7 +297,6 @@ function createNotification(user_telegram_id, type, message) {
 
 // Инициализация тестовых данных
 function initializeTestData() {
-    // Создаем тестового пользователя
     const testUser = {
         id: userCounter++,
         username: 'Тестовый Пользователь',
@@ -297,7 +316,6 @@ function initializeTestData() {
     };
     users.push(testUser);
     
-    // Создаем несколько тестовых ордеров
     const orderTypes = ['nft_gift', 'nft_username', 'nft_number'];
     const paymentMethods = ['ton', 'card', 'stars'];
     const currencies = ['USD', 'RUB', 'TON', 'STARS'];
@@ -324,7 +342,6 @@ function initializeTestData() {
         };
         orders.push(order);
         
-        // Создаем уведомления для завершенных сделок
         if (i > 1) {
             createNotification(
                 testUser.telegram_id,
@@ -342,6 +359,11 @@ function initializeTestData() {
 
 // Инициализируем тестовые данные при старте
 initializeTestData();
+
+// Все остальные маршруты ведут к index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Запуск сервера
 const PORT = process.env.PORT || 3000;

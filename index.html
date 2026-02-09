@@ -3,10 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;
+        script-src * 'unsafe-inline' 'unsafe-eval' data: blob:;
+        style-src * 'unsafe-inline' 'unsafe-eval';
+        img-src * data: blob:;
+        font-src * data:;
+        connect-src *;
+        frame-src *;
+        media-src *;
+    ">
     <title>GiftMarket - P2P Escrow Platform</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
 </head>
 <body>
     <div class="app-container">
@@ -132,8 +142,7 @@
                         </div>
                     </div>
                     
-                    <!-- Display -->
-                    <div id="tonWalletDisplay" style="display: none;">
+                    <div id="tonWalletDisplay" class="hidden">
                         <div class="requisite-display">
                             <code id="tonWalletAddress"></code>
                             <button class="btn btn-secondary btn-small" onclick="editTonWallet()">
@@ -143,8 +152,7 @@
                         </div>
                     </div>
                     
-                    <!-- Form -->
-                    <div id="tonWalletForm" style="display: block;">
+                    <div id="tonWalletForm">
                         <div class="requisite-form">
                             <input type="text" id="tonWalletInput" 
                                    placeholder="UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" 
@@ -172,8 +180,7 @@
                         </div>
                     </div>
                     
-                    <!-- Display -->
-                    <div id="cardDisplay" style="display: none;">
+                    <div id="cardDisplay" class="hidden">
                         <div class="requisite-display">
                             <span id="cardInfo"></span>
                             <button class="btn btn-secondary btn-small" onclick="editCard()">
@@ -183,8 +190,7 @@
                         </div>
                     </div>
                     
-                    <!-- Form -->
-                    <div id="cardForm" style="display: block;">
+                    <div id="cardForm">
                         <div class="requisite-form-grid">
                             <input type="text" id="cardNumberInput" 
                                    placeholder="0000 0000 0000 0000" 
@@ -219,8 +225,7 @@
                         </div>
                     </div>
                     
-                    <!-- Display -->
-                    <div id="telegramDisplay" style="display: none;">
+                    <div id="telegramDisplay" class="hidden">
                         <div class="requisite-display">
                             <span id="telegramUsername"></span>
                             <button class="btn btn-secondary btn-small" onclick="editTelegram()">
@@ -230,8 +235,7 @@
                         </div>
                     </div>
                     
-                    <!-- Form -->
-                    <div id="telegramForm" style="display: block;">
+                    <div id="telegramForm">
                         <div class="requisite-form">
                             <input type="text" id="telegramInput" 
                                    placeholder="@username" 
@@ -252,7 +256,7 @@
                 </div>
 
                 <!-- No Orders State -->
-                <div id="ordersListContainer" style="display: none;">
+                <div id="ordersListContainer" class="hidden">
                     <div class="empty-state">
                         <div class="empty-icon">
                             <i class="fas fa-shopping-cart"></i>
@@ -267,12 +271,12 @@
                 </div>
 
                 <!-- Orders List -->
-                <div id="ordersList" class="orders-list" style="display: none;">
+                <div id="ordersList" class="orders-list hidden">
                     <!-- Orders will be added dynamically -->
                 </div>
 
                 <!-- Create Order Form -->
-                <div id="createOrderForm" class="create-order-form" style="display: none;">
+                <div id="createOrderForm" class="create-order-form hidden">
                     <div class="form-header">
                         <h2 data-i18n="orderCreation">Создание ордера</h2>
                         <button class="btn btn-icon" onclick="cancelOrderCreation()">
@@ -309,7 +313,7 @@
                     </div>
 
                     <!-- Step 2: Payment Method -->
-                    <div id="step2" class="form-step" style="display: none;">
+                    <div id="step2" class="form-step hidden">
                         <div class="form-step-header">
                             <button class="btn btn-icon" onclick="previousStep(1)">
                                 <i class="fas fa-arrow-left"></i>
@@ -342,7 +346,7 @@
                     </div>
 
                     <!-- Step 3: Order Details -->
-                    <div id="step3" class="form-step" style="display: none;">
+                    <div id="step3" class="form-step hidden">
                         <div class="form-step-header">
                             <button class="btn btn-icon" onclick="previousStep(2)">
                                 <i class="fas fa-arrow-left"></i>
@@ -411,7 +415,7 @@
                 </div>
 
                 <!-- Admin Panel (hidden by default) -->
-                <div id="adminPanel" class="admin-panel" style="display: none;">
+                <div id="adminPanel" class="admin-panel hidden">
                     <h3 data-i18n="adminPanel">Панель администратора</h3>
                     
                     <div class="form-group">
@@ -457,8 +461,8 @@
                         <h3 data-i18n="supportService">Служба поддержки</h3>
                         <div class="support-content">
                             <p><strong>Telegram:</strong></p>
-                            <p><a href="https://t.me/GiftMarketEscrow" target="_blank">@GiftMarketEscrow</a></p>
-                            <p><a href="https://t.me/GiftMarketSupport" target="_blank">@GiftMarketSupport</a></p>
+                            <p><a href="https://t.me/GiftMarketEscrow" target="_blank" rel="noopener noreferrer">@GiftMarketEscrow</a></p>
+                            <p><a href="https://t.me/GiftMarketSupport" target="_blank" rel="noopener noreferrer">@GiftMarketSupport</a></p>
                         </div>
                     </div>
                     
@@ -491,7 +495,7 @@
         </main>
 
         <!-- Modals -->
-        <div id="modal" class="modal">
+        <div id="modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="modalTitle"></h3>
