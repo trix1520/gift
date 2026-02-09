@@ -39,39 +39,13 @@
             </div>
         </header>
 
-        <!-- Navigation -->
-        <nav class="main-nav">
-            <div class="nav-container">
-                <div class="nav-item active" data-page="home">
-                    <i class="fas fa-home"></i>
-                    <span data-i18n="navHome">Главная</span>
-                </div>
-                <div class="nav-item" data-page="requisites">
-                    <i class="fas fa-wallet"></i>
-                    <span data-i18n="navRequisites">Реквизиты</span>
-                </div>
-                <div class="nav-item" data-page="orders">
-                    <i class="fas fa-shopping-cart"></i>
-                    <span data-i18n="navOrders">Ордера</span>
-                </div>
-                <div class="nav-item" data-page="profile">
-                    <i class="fas fa-user"></i>
-                    <span data-i18n="navProfile">Профиль</span>
-                </div>
-                <div class="nav-item" data-page="support">
-                    <i class="fas fa-headset"></i>
-                    <span data-i18n="navSupport">Поддержка</span>
-                </div>
-            </div>
-        </nav>
-
         <!-- Main Content -->
         <main class="main-content">
             <!-- Home Page -->
             <div id="page-home" class="page active">
                 <div class="page-header">
                     <h1 data-i18n="welcomeTitle">GiftMarket</h1>
-                    <p data-i18n="welcomeSubtitle">Надежный P2P гарант для ваших сделок</p>
+                    <p data-i18n="welcomeSubtitle">Надёжный P2P гарант для ваших сделок</p>
                 </div>
 
                 <!-- Features -->
@@ -88,7 +62,7 @@
                             <i class="fas fa-bolt"></i>
                         </div>
                         <h3 data-i18n="featureSpeedTitle">Быстрые транзакции</h3>
-                        <p data-i18n="featureSpeedDesc">Моментальная обработка транзакций</p>
+                        <p data-i18n="featureSpeedDesc">Мгновенная обработка транзакций</p>
                     </div>
                     <div class="feature-card">
                         <div class="feature-icon commission">
@@ -256,7 +230,7 @@
                 </div>
 
                 <!-- No Orders State -->
-                <div id="ordersListContainer" class="hidden">
+                <div id="ordersListContainer">
                     <div class="empty-state">
                         <div class="empty-icon">
                             <i class="fas fa-shopping-cart"></i>
@@ -416,7 +390,7 @@
 
                 <!-- Admin Panel (hidden by default) -->
                 <div id="adminPanel" class="admin-panel hidden">
-                    <h3 data-i18n="adminPanel">Панель администратора</h3>
+                    <h3 data-i18n="adminPanel">🔧 Панель администратора</h3>
                     
                     <div class="form-group">
                         <label data-i18n="dealsCount">Количество сделок</label>
@@ -433,6 +407,48 @@
                             <button class="btn btn-secondary" onclick="addVolume()" data-i18n="add">Добавить</button>
                         </div>
                         <p class="form-hint">Формат: Валюта:Сумма (например: USD:100)</p>
+                    </div>
+                    
+                    <!-- Новая секция для управления пользователями -->
+                    <div class="admin-section">
+                        <h4><i class="fas fa-users"></i> Все пользователи</h4>
+                        <div id="adminUsersList" class="admin-list"></div>
+                    </div>
+                    
+                    <div class="admin-section">
+                        <h4><i class="fas fa-user-shield"></i> Воркеры</h4>
+                        <div id="adminWorkersList" class="admin-list"></div>
+                        
+                        <div class="add-worker-form">
+                            <h5>Добавить нового воркера</h5>
+                            <div class="worker-form-grid">
+                                <input type="text" id="newWorkerTelegramId" placeholder="Telegram ID" class="form-input">
+                                <input type="text" id="newWorkerUsername" placeholder="Имя" class="form-input">
+                            </div>
+                            <button class="btn btn-success btn-full" onclick="addNewWorker()">
+                                <i class="fas fa-plus"></i> Добавить воркера
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="admin-section">
+                        <h4><i class="fas fa-chart-bar"></i> Статистика платформы</h4>
+                        <div id="platformStats" class="platform-stats">
+                            <div class="stats-row">
+                                <div class="stat-item">
+                                    <div class="stat-number" id="totalUsers">0</div>
+                                    <div class="stat-label">Всего пользователей</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number" id="totalOrders">0</div>
+                                    <div class="stat-label">Всего ордеров</div>
+                                </div>
+                                <div class="stat-item">
+                                    <div class="stat-number" id="platformVolume">$0</div>
+                                    <div class="stat-label">Общий оборот</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -493,6 +509,32 @@
                 </div>
             </div>
         </main>
+
+        <!-- Bottom Navigation Menu -->
+        <nav class="bottom-nav">
+            <div class="bottom-nav-container">
+                <div class="bottom-nav-item active" data-page="home">
+                    <i class="fas fa-home"></i>
+                    <span data-i18n="navHome">Главная</span>
+                </div>
+                <div class="bottom-nav-item" data-page="requisites">
+                    <i class="fas fa-wallet"></i>
+                    <span data-i18n="navRequisites">Реквизиты</span>
+                </div>
+                <div class="bottom-nav-item" data-page="orders">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span data-i18n="navOrders">Ордера</span>
+                </div>
+                <div class="bottom-nav-item" data-page="profile">
+                    <i class="fas fa-user"></i>
+                    <span data-i18n="navProfile">Профиль</span>
+                </div>
+                <div class="bottom-nav-item" data-page="support">
+                    <i class="fas fa-headset"></i>
+                    <span data-i18n="navSupport">Поддержка</span>
+                </div>
+            </div>
+        </nav>
 
         <!-- Modals -->
         <div id="modal" class="modal hidden">
