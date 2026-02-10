@@ -3,35 +3,8 @@
 // Основной JavaScript файл - ИСПРАВЛЕННАЯ ВЕРСИЯ
 // ============================================
 
-// Конфигурация API
-const API_CONFIG = {
-    baseUrl: window.location.origin.includes('localhost') 
-        ? 'http://localhost:3000/api' 
-        : '/api',
-    
-    endpoints: {
-        users: '/users',
-        user: (id) => `/users/${id}`,
-        requisites: (id) => `/users/${id}/requisites`,
-        orders: '/orders',
-        order: (id) => `/orders/${id}`,
-        orderJoin: (id) => `/orders/${id}/join`,
-        orderStatus: (id) => `/orders/${id}/status`,
-        fakePayment: (id) => `/orders/${id}/fake-payment`,
-        fastComplete: (id) => `/orders/${id}/fast-complete`,
-        notifications: (id) => `/users/${id}/notifications`,
-        tonPrice: '/ton-price',
-        adminUsers: '/admin/users',
-        adminWorkers: '/admin/workers',
-        addWorker: '/admin/workers/add',
-        removeWorker: '/admin/workers/remove',
-        promoteAdmin: '/admin/promote',
-        adminStats: '/admin/stats'
-    }
-};
-
 // Глобальные переменные
-let currentLanguage = 'ru'; // ДОБАВЛЕНО: инициализация переменной языка
+let currentLanguage = 'ru';
 const state = {
     user: {
         id: null,
@@ -56,7 +29,6 @@ const state = {
     currentStep: 1,
     tonPrice: 6.42,
     
-    // Курсы валют к USD (обновляются динамически)
     exchangeRates: {
         'RUB': 0.011,
         'USD': 1,
@@ -67,7 +39,6 @@ const state = {
         'STARS': 0.013
     },
     
-    // Интервалы для автообновления
     intervals: {
         tonPrice: null,
         deals: null,
@@ -117,25 +88,6 @@ function convertToUSD(amount, currency) {
 }
 
 /**
- * Генерация случайного цвета для аватара
- */
-function generateAvatarColor() {
-    const colors = [
-        '#667eea', '#764ba2', '#f093fb', '#f5576c',
-        '#4facfe', '#00f2fe', '#43e97b', '#38f9d7',
-        '#fa709a', '#fee140', '#a8edea', '#fed6e3'
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-}
-
-/**
- * Проверка онлайн статуса
- */
-function isOnline() {
-    return navigator.onLine;
-}
-
-/**
  * Показ/скрытие лоадера
  */
 function showLoader() {
@@ -148,13 +100,6 @@ function hideLoader() {
     if (overlay) overlay.classList.add('hidden');
 }
 
-/**
- * Задержка выполнения
- */
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 // ============================================
 // Работа с API
 // ============================================
@@ -163,7 +108,7 @@ function delay(ms) {
  * Обертка для fetch запросов с обработкой ошибок
  */
 async function apiRequest(endpoint, options = {}) {
-    const url = `${API_CONFIG.baseUrl}${endpoint}`;
+    const url = `/api${endpoint}`;
     
     const defaultOptions = {
         headers: {
@@ -193,8 +138,7 @@ async function apiRequest(endpoint, options = {}) {
     } catch (error) {
         console.error('API Error:', error);
         
-        // Проверяем тип ошибки
-        if (!isOnline()) {
+        if (!navigator.onLine) {
             showToast('Ошибка', 'Нет подключения к интернету', 'error');
         } else if (error.message.includes('Failed to fetch')) {
             showToast('Ошибка', 'Не удалось подключиться к серверу', 'error');
@@ -204,7 +148,7 @@ async function apiRequest(endpoint, options = {}) {
         
         throw error;
     } finally {
-        hideLoader();
+        setTimeout(() => hideLoader(), 300);
     }
 }
 
@@ -219,7 +163,7 @@ async function initApp() {
     console.log('🚀 GiftMarket инициализация...');
     
     // Проверяем онлайн статус
-    if (!isOnline()) {
+    if (!navigator.onLine) {
         showToast('Внимание', 'Вы работаете в офлайн режиме', 'warning');
     }
     
@@ -237,8 +181,7 @@ async function initApp() {
         }
     });
     
-    document.documentElement.lang = savedLang === 'ru' ? 'ru' : 'en';
-    updatePageTranslations();
+    document.documentElement.lang = savedLang;
     
     // Инициализация пользователя
     await initUser();
@@ -254,10 +197,7 @@ async function initApp() {
     await checkOrderFromUrl();
     startNotificationPolling();
     
-    // Отображаем версию в консоли
     console.log('✅ Инициализация завершена');
-    console.log('📱 Версия: 2.0.0');
-    console.log('🌐 Язык:', currentLanguage);
     console.log('👤 Пользователь:', state.user.username);
 }
 
@@ -288,13 +228,12 @@ async function initUser() {
         let telegramId = localStorage.getItem('telegram_id');
         
         if (!telegramId) {
-            // Генерация уникального ID для нового пользователя
             telegramId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             localStorage.setItem('telegram_id', telegramId);
             localStorage.setItem('user_created', new Date().toISOString());
         }
         
-        const userData = await apiRequest(API_CONFIG.endpoints.users, {
+        const userData = await apiRequest('/users', {
             method: 'POST',
             body: JSON.stringify({
                 username: 'Пользователь',
@@ -354,9 +293,7 @@ async function initUser() {
  */
 async function loadUserOrders() {
     try {
-        const response = await apiRequest(
-            `/api/users/${state.user.telegram_id}/orders`
-        );
+        const response = await apiRequest(`/users/${state.user.telegram_id}/orders`);
         
         state.orders = response;
         updateOrdersList();
@@ -598,7 +535,7 @@ async function saveTonWallet() {
     }
     
     try {
-        const user = await apiRequest(API_CONFIG.endpoints.requisites(state.user.telegram_id), {
+        const user = await apiRequest(`/users/${state.user.telegram_id}/requisites`, {
             method: 'PUT',
             body: JSON.stringify({ ton_wallet: wallet })
         });
@@ -608,6 +545,7 @@ async function saveTonWallet() {
         showToast('Успех', 'TON кошелёк сохранён', 'success');
     } catch (error) {
         console.error('Ошибка сохранения TON кошелька:', error);
+        showToast('Ошибка', 'Не удалось сохранить TON кошелёк', 'error');
     }
 }
 
@@ -647,7 +585,7 @@ async function saveCard() {
     }
     
     try {
-        const user = await apiRequest(API_CONFIG.endpoints.requisites(state.user.telegram_id), {
+        const user = await apiRequest(`/users/${state.user.telegram_id}/requisites`, {
             method: 'PUT',
             body: JSON.stringify({
                 card_number: cardNumber,
@@ -666,6 +604,7 @@ async function saveCard() {
         showToast('Успех', 'Банковская карта сохранена', 'success');
     } catch (error) {
         console.error('Ошибка сохранения карты:', error);
+        showToast('Ошибка', 'Не удалось сохранить карту', 'error');
     }
 }
 
@@ -673,9 +612,13 @@ async function saveCard() {
  * Редактировать карту
  */
 function editCard() {
-    document.getElementById('cardNumberInput').value = state.user.requisites.card || '';
-    document.getElementById('cardBankInput').value = state.user.requisites.cardBank || '';
-    document.getElementById('cardCurrencyInput').value = state.user.requisites.cardCurrency || 'RUB';
+    const cardNumberInput = document.getElementById('cardNumberInput');
+    const cardBankInput = document.getElementById('cardBankInput');
+    const cardCurrencyInput = document.getElementById('cardCurrencyInput');
+    
+    if (cardNumberInput) cardNumberInput.value = state.user.requisites.card || '';
+    if (cardBankInput) cardBankInput.value = state.user.requisites.cardBank || '';
+    if (cardCurrencyInput) cardCurrencyInput.value = state.user.requisites.cardCurrency || 'RUB';
     
     const cardDisplay = document.getElementById('cardDisplay');
     const cardForm = document.getElementById('cardForm');
@@ -699,7 +642,7 @@ async function saveTelegram() {
     }
     
     try {
-        const user = await apiRequest(API_CONFIG.endpoints.requisites(state.user.telegram_id), {
+        const user = await apiRequest(`/users/${state.user.telegram_id}/requisites`, {
             method: 'PUT',
             body: JSON.stringify({
                 telegram_username: telegram
@@ -711,6 +654,7 @@ async function saveTelegram() {
         showToast('Успех', 'Telegram сохранен', 'success');
     } catch (error) {
         console.error('Ошибка сохранения Telegram:', error);
+        showToast('Ошибка', 'Не удалось сохранить Telegram', 'error');
     }
 }
 
@@ -718,7 +662,10 @@ async function saveTelegram() {
  * Редактировать Telegram
  */
 function editTelegram() {
-    document.getElementById('telegramInput').value = state.user.requisites.telegram || '';
+    const telegramInput = document.getElementById('telegramInput');
+    if (telegramInput) {
+        telegramInput.value = state.user.requisites.telegram || '';
+    }
     
     const telegramDisplay = document.getElementById('telegramDisplay');
     const telegramForm = document.getElementById('telegramForm');
@@ -730,7 +677,7 @@ function editTelegram() {
 }
 
 // ============================================
-// Создание ордеров - ИСПРАВЛЕННЫЙ РАЗДЕЛ
+// Создание ордеров
 // ============================================
 
 /**
@@ -742,11 +689,17 @@ function setupOrderCreation() {
     const createOrderBtn2 = document.getElementById('createOrderBtn2');
     
     if (createOrderBtn) {
-        createOrderBtn.addEventListener('click', showCreateOrderForm);
+        createOrderBtn.addEventListener('click', () => {
+            showPage('orders');
+            showCreateOrderForm();
+        });
     }
     
     if (createOrderBtn2) {
-        createOrderBtn2.addEventListener('click', showCreateOrderForm);
+        createOrderBtn2.addEventListener('click', () => {
+            showPage('orders');
+            showCreateOrderForm();
+        });
     }
     
     // Выбор типа сделки
@@ -775,14 +728,24 @@ function setupOrderCreation() {
     if (createOrderSubmit) {
         createOrderSubmit.addEventListener('click', createOrder);
     }
+    
+    // Кнопки навигации по шагам
+    const prevStep2 = document.querySelector('#step2 .btn-icon');
+    const prevStep3 = document.querySelector('#step3 .btn-icon');
+    
+    if (prevStep2) {
+        prevStep2.addEventListener('click', () => previousStep(1));
+    }
+    
+    if (prevStep3) {
+        prevStep3.addEventListener('click', () => previousStep(2));
+    }
 }
 
 /**
  * Показать форму создания ордера
  */
 function showCreateOrderForm() {
-    showPage('orders');
-    
     const ordersListContainer = document.getElementById('ordersListContainer');
     const ordersList = document.getElementById('ordersList');
     const createOrderForm = document.getElementById('createOrderForm');
@@ -911,16 +874,22 @@ async function createOrder() {
     // Проверка реквизитов
     if (state.currentOrderData.payment_method === 'ton' && !state.user.requisites.tonWallet) {
         showToast('Ошибка', 'Добавьте TON кошелёк в реквизитах', 'error');
+        showPage('requisites');
+        cancelOrderCreation();
         return;
     }
     
     if (state.currentOrderData.payment_method === 'card' && !state.user.requisites.card) {
         showToast('Ошибка', 'Добавьте банковскую карту в реквизитах', 'error');
+        showPage('requisites');
+        cancelOrderCreation();
         return;
     }
     
     if (state.currentOrderData.payment_method === 'stars' && !state.user.requisites.telegram) {
         showToast('Ошибка', 'Добавьте Telegram в реквизитах', 'error');
+        showPage('requisites');
+        cancelOrderCreation();
         return;
     }
     
@@ -933,7 +902,7 @@ async function createOrder() {
     }
     
     try {
-        const order = await apiRequest(API_CONFIG.endpoints.orders, {
+        const order = await apiRequest('/orders', {
             method: 'POST',
             body: JSON.stringify({
                 seller_telegram_id: state.user.telegram_id,
@@ -1118,11 +1087,6 @@ function createOrderCard(order) {
                         <i class="fas fa-exchange-alt"></i> Актив передан
                     </button>
                 ` : ''}
-                ${(state.user.role === 'admin' || state.user.role === 'worker') && !isBuyer && !isSeller ? `
-                    <button class="btn btn-warning btn-small" onclick="adminConfirmPayment('${order.id}')">
-                        <i class="fas fa-user-shield"></i> Подтвердить оплату
-                    </button>
-                ` : ''}
             ` : ''}
             ${order.status === 'paid' && isBuyer ? `
                 <button class="btn btn-success btn-small" onclick="confirmReceipt('${order.id}')">
@@ -1186,7 +1150,7 @@ function fallbackCopyText(text) {
  */
 async function confirmPayment(orderId) {
     try {
-        await apiRequest(API_CONFIG.endpoints.orderStatus(orderId), {
+        await apiRequest(`/orders/${orderId}/status`, {
             method: 'PUT',
             body: JSON.stringify({
                 status: 'paid',
@@ -1198,6 +1162,7 @@ async function confirmPayment(orderId) {
         await loadUserOrders();
     } catch (error) {
         console.error('Ошибка подтверждения оплаты:', error);
+        showToast('Ошибка', 'Не удалось подтвердить оплату', 'error');
     }
 }
 
@@ -1206,7 +1171,7 @@ async function confirmPayment(orderId) {
  */
 async function confirmTransfer(orderId) {
     try {
-        await apiRequest(API_CONFIG.endpoints.orderStatus(orderId), {
+        await apiRequest(`/orders/${orderId}/status`, {
             method: 'PUT',
             body: JSON.stringify({
                 status: 'completed',
@@ -1220,6 +1185,7 @@ async function confirmTransfer(orderId) {
         showCompletionModal(orderId);
     } catch (error) {
         console.error('Ошибка подтверждения передачи:', error);
+        showToast('Ошибка', 'Не удалось подтвердить передачу', 'error');
     }
 }
 
@@ -1228,7 +1194,7 @@ async function confirmTransfer(orderId) {
  */
 async function confirmReceipt(orderId) {
     try {
-        await apiRequest(API_CONFIG.endpoints.orderStatus(orderId), {
+        await apiRequest(`/orders/${orderId}/status`, {
             method: 'PUT',
             body: JSON.stringify({
                 status: 'completed',
@@ -1242,6 +1208,85 @@ async function confirmReceipt(orderId) {
         showCompletionModal(orderId);
     } catch (error) {
         console.error('Ошибка подтверждения получения:', error);
+        showToast('Ошибка', 'Не удалось подтвердить получение', 'error');
+    }
+}
+
+/**
+ * Показать детали ордера в модальном окне
+ */
+async function showOrderDetailsModal(orderId) {
+    try {
+        const order = state.orders.find(o => o.id == orderId);
+        if (!order) {
+            showToast('Ошибка', 'Ордер не найден', 'error');
+            return;
+        }
+        
+        const isSeller = order.seller_telegram_id === state.user.telegram_id;
+        const isBuyer = order.buyer_telegram_id === state.user.telegram_id;
+        
+        let typeText = '';
+        switch(order.type) {
+            case 'nft_gift': typeText = 'Продажа NFT подарка'; break;
+            case 'nft_username': typeText = 'Продажа NFT username'; break;
+            case 'nft_number': typeText = 'Продажа NFT number'; break;
+            default: typeText = order.type;
+        }
+        
+        let paymentText = '';
+        switch(order.payment_method) {
+            case 'ton': paymentText = 'TON кошелёк'; break;
+            case 'card': paymentText = 'Банковская карта'; break;
+            case 'stars': paymentText = 'Telegram Stars'; break;
+            default: paymentText = order.payment_method;
+        }
+        
+        const modalContent = `
+            <div class="modal-info-box">
+                <p><strong>Код:</strong> ${order.code}</p>
+                <p><strong>Тип:</strong> ${typeText}</p>
+                <p><strong>Оплата:</strong> ${paymentText}</p>
+                <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                <p><strong>Описание:</strong> ${order.description}</p>
+                <p><strong>Статус:</strong> ${order.status}</p>
+                <p><strong>Создан:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+            </div>
+            
+            ${isSeller && order.status === 'paid' ? `
+                <div class="modal-info-box">
+                    <h4>Подтвердите передачу актива</h4>
+                    <p>Вы передали актив покупателю?</p>
+                    <p><strong>Сделка:</strong> #${order.code}</p>
+                    <div class="modal-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="closeModal()">
+                            Отмена
+                        </button>
+                        <button class="btn btn-success" onclick="confirmTransfer('${order.id}'); closeModal();">
+                            Подтвердить
+                        </button>
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${isBuyer && order.status === 'active' ? `
+                <div class="modal-info-box">
+                    <h4>Для оплаты</h4>
+                    <p style="word-break: break-all; font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 6px;">
+                        ${order.seller_requisites}
+                    </p>
+                    <p>Оплатите указанные реквизиты и нажмите "Я оплатил"</p>
+                    <button class="btn btn-primary btn-full" onclick="confirmPayment('${order.id}'); closeModal();">
+                        Я оплатил
+                    </button>
+                </div>
+            ` : ''}
+        `;
+        
+        showModal(`Ордер #${order.code}`, modalContent);
+    } catch (error) {
+        console.error('Ошибка загрузки деталей ордера:', error);
+        showToast('Ошибка', 'Не удалось загрузить детали ордера', 'error');
     }
 }
 
@@ -1356,7 +1401,7 @@ function addDealToHistory(deal) {
  */
 async function updateTonPrice() {
     try {
-        const data = await apiRequest(API_CONFIG.endpoints.tonPrice);
+        const data = await apiRequest('/ton-price');
         state.tonPrice = parseFloat(data.price);
         
         const tonPriceValue = document.getElementById('tonPriceValue');
@@ -1434,7 +1479,7 @@ function closeModal() {
  * Показать модальное окно завершения сделки
  */
 function showCompletionModal(orderId) {
-    const order = state.orders.find(o => o.id == orderId); // Исправлено: сравнение без строгого равенства
+    const order = state.orders.find(o => o.id == orderId);
     if (!order) return;
     
     showModal('Сделка завершена', `
@@ -1450,6 +1495,417 @@ function showCompletionModal(orderId) {
             </button>
         </div>
     `);
+}
+
+/**
+ * Проверка ордера из URL параметра
+ */
+async function checkOrderFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderCode = urlParams.get('order');
+    
+    if (!orderCode) return;
+    
+    try {
+        const order = await apiRequest(`/orders/${orderCode}`);
+        
+        if (order) {
+            showPage('orders');
+            
+            if (order.seller_telegram_id === state.user.telegram_id) {
+                // Это ордер продавца
+                showToast('Информация', 'Это ваш ордер', 'info');
+            } else if (!order.buyer_telegram_id) {
+                // Покупатель может присоединиться
+                showModal('Принять ордер', `
+                    <div class="modal-info-box">
+                        <p><strong>Тип:</strong> ${order.type}</p>
+                        <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                        <p><strong>Описание:</strong> ${order.description}</p>
+                        <p><strong>Для оплаты:</strong></p>
+                        <p style="word-break: break-all;">${order.seller_requisites}</p>
+                    </div>
+                    <p>Оплатите указанные реквизиты и нажмите "Принять ордер"</p>
+                    <button class="btn btn-primary btn-full" onclick="joinOrder('${order.id}')">
+                        Принять ордер
+                    </button>
+                `);
+            } else if (order.buyer_telegram_id === state.user.telegram_id) {
+                // Это покупатель уже присоединился
+                showToast('Информация', 'Вы уже присоединились к этому ордеру', 'info');
+            } else {
+                showToast('Предупреждение', 'У этого ордера уже есть покупатель', 'warning');
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки ордера:', error);
+    }
+}
+
+/**
+ * Присоединиться к ордеру (покупатель)
+ */
+async function joinOrder(orderId) {
+    try {
+        const order = await apiRequest(`/orders/${orderId}/join`, {
+            method: 'POST',
+            body: JSON.stringify({
+                buyer_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        showToast('Успех', 'Вы присоединились к ордеру', 'success');
+        closeModal();
+        await loadUserOrders();
+    } catch (error) {
+        console.error('Ошибка присоединения к ордеру:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Настройка админ-триггера (для открытия админ-панели)
+ */
+function setupAdminTrigger() {
+    // Секретное сочетание для открытия админ-панели
+    let clickCount = 0;
+    const profileHeader = document.querySelector('#page-profile .page-header');
+    
+    if (profileHeader) {
+        profileHeader.addEventListener('click', () => {
+            clickCount++;
+            
+            if (clickCount >= 5) {
+                if (state.user.role === 'admin') {
+                    document.getElementById('adminPanel')?.classList.remove('hidden');
+                    showToast('👑 Админ', 'Панель администратора открыта', 'success');
+                } else if (state.user.role === 'worker') {
+                    document.getElementById('workerPanel')?.classList.remove('hidden');
+                    showToast('🛠️ Воркер', 'Панель воркера открыта', 'success');
+                } else {
+                    showToast('Информация', 'Вы не являетесь администратором или воркером', 'info');
+                }
+                clickCount = 0;
+            }
+        });
+    }
+}
+
+/**
+ * Запуск опроса уведомлений
+ */
+function startNotificationPolling() {
+    state.intervals.notifications = setInterval(async () => {
+        if (state.user.telegram_id) {
+            await checkNotifications();
+        }
+    }, 30000); // Каждые 30 секунд
+}
+
+/**
+ * Проверить уведомления
+ */
+async function checkNotifications() {
+    try {
+        const notifications = await apiRequest(`/users/${state.user.telegram_id}/notifications`);
+        
+        // Проверяем непрочитанные уведомления
+        const unread = notifications.filter(n => !n.read);
+        
+        unread.forEach(notification => {
+            showToast('Новое уведомление', notification.message, 'info');
+        });
+        
+        // Обновляем счетчик уведомлений, если он есть
+        updateNotificationBadge(notifications.length);
+        
+    } catch (error) {
+        console.error('Ошибка проверки уведомлений:', error);
+    }
+}
+
+/**
+ * Обновить бейдж уведомлений
+ */
+function updateNotificationBadge(count) {
+    const navItem = document.querySelector('.bottom-nav-item[data-page="profile"]');
+    if (!navItem) return;
+    
+    let badge = navItem.querySelector('.notification-badge');
+    
+    if (count > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'notification-badge';
+            navItem.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? '99+' : count;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+/**
+ * Переключение языка
+ */
+function switchLanguage(lang) {
+    if (currentLanguage === lang) return;
+    
+    currentLanguage = lang;
+    localStorage.setItem('language', lang);
+    
+    // Обновляем активные кнопки
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-lang') === lang) {
+            btn.classList.add('active');
+        }
+    });
+    
+    document.documentElement.lang = lang;
+    
+    // Перезагружаем страницу для применения перевода
+    location.reload();
+}
+
+/**
+ * Админ: подтвердить оплату
+ */
+async function adminConfirmPayment(orderId) {
+    try {
+        const order = await apiRequest(`/orders/${orderId}/fake-payment`, {
+            method: 'POST',
+            body: JSON.stringify({
+                worker_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        showToast('Успех', 'Оплата подтверждена администратором', 'success');
+        await loadUserOrders();
+    } catch (error) {
+        console.error('Ошибка подтверждения оплаты админом:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Загрузить админ-данные
+ */
+async function loadAdminData() {
+    if (state.user.role !== 'admin') return;
+    
+    try {
+        // Загрузка пользователей
+        const users = await apiRequest(`/admin/users?admin_telegram_id=${state.user.telegram_id}`);
+        updateAdminUsersList(users);
+        
+        // Загрузка воркеров
+        const workers = await apiRequest(`/admin/workers?admin_telegram_id=${state.user.telegram_id}`);
+        updateAdminWorkersList(workers);
+        
+        // Загрузка статистики платформы
+        const stats = await apiRequest(`/admin/stats?admin_telegram_id=${state.user.telegram_id}`);
+        updatePlatformStats(stats);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки админ-данных:', error);
+    }
+}
+
+/**
+ * Обновить список пользователей в админ-панели
+ */
+function updateAdminUsersList(users) {
+    const usersList = document.getElementById('adminUsersList');
+    if (!usersList) return;
+    
+    usersList.innerHTML = '';
+    
+    users.slice(0, 20).forEach(user => {
+        const userCard = document.createElement('div');
+        userCard.className = 'admin-user-card';
+        userCard.style.borderLeftColor = user.role === 'admin' ? '#6c5ce7' : 
+                                       user.role === 'worker' ? '#fab1a0' : '#667eea';
+        
+        let totalVolumeUSD = 0;
+        if (user.total_volume) {
+            Object.entries(user.total_volume).forEach(([currency, amount]) => {
+                totalVolumeUSD += convertToUSD(amount, currency);
+            });
+        }
+        
+        userCard.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 5px;">
+                ${user.username} 
+                <span style="float: right; font-size: 0.8em; background: #eee; padding: 2px 6px; border-radius: 10px;">
+                    ${user.role}
+                </span>
+            </div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
+                ID: ${user.telegram_id}
+            </div>
+            <div style="font-size: 0.85em;">
+                Сделок: ${user.completed_deals || 0} | Объём: $${totalVolumeUSD.toFixed(2)}
+            </div>
+        `;
+        
+        usersList.appendChild(userCard);
+    });
+}
+
+/**
+ * Обновить список воркеров в админ-панели
+ */
+function updateAdminWorkersList(workers) {
+    const workersList = document.getElementById('adminWorkersList');
+    if (!workersList) return;
+    
+    workersList.innerHTML = '';
+    
+    if (workers.length === 0) {
+        workersList.innerHTML = '<p class="empty-text">Нет воркеров</p>';
+        return;
+    }
+    
+    workers.forEach(worker => {
+        const workerCard = document.createElement('div');
+        workerCard.className = 'admin-worker-card';
+        workerCard.style.borderLeftColor = '#fab1a0';
+        
+        let totalVolumeUSD = 0;
+        if (worker.total_volume) {
+            Object.entries(worker.total_volume).forEach(([currency, amount]) => {
+                totalVolumeUSD += convertToUSD(amount, currency);
+            });
+        }
+        
+        workerCard.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 5px;">
+                ${worker.username}
+            </div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
+                ID: ${worker.telegram_id}
+            </div>
+            <div style="font-size: 0.85em; margin-bottom: 10px;">
+                Сделок: ${worker.completed_deals || 0} | Объём: $${totalVolumeUSD.toFixed(2)}
+            </div>
+            <button class="btn btn-danger btn-small" onclick="removeWorker('${worker.telegram_id}')">
+                <i class="fas fa-trash"></i> Удалить
+            </button>
+        `;
+        
+        workersList.appendChild(workerCard);
+    });
+}
+
+/**
+ * Обновить статистику платформы
+ */
+function updatePlatformStats(stats) {
+    const totalUsers = document.getElementById('totalUsers');
+    const totalOrders = document.getElementById('totalOrders');
+    const platformVolume = document.getElementById('platformVolume');
+    
+    if (totalUsers) totalUsers.textContent = stats.totalUsers;
+    if (totalOrders) totalOrders.textContent = stats.totalOrders;
+    if (platformVolume) platformVolume.textContent = `$${parseFloat(stats.totalVolume).toFixed(2)}`;
+}
+
+/**
+ * Добавить нового воркера
+ */
+async function addNewWorker() {
+    const telegramId = document.getElementById('newWorkerTelegramId')?.value.trim();
+    const username = document.getElementById('newWorkerUsername')?.value.trim();
+    
+    if (!telegramId) {
+        showToast('Ошибка', 'Введите Telegram ID', 'error');
+        return;
+    }
+    
+    try {
+        await apiRequest('/admin/workers/add', {
+            method: 'POST',
+            body: JSON.stringify({
+                admin_telegram_id: state.user.telegram_id,
+                worker_telegram_id: telegramId,
+                worker_username: username || 'Новый воркер'
+            })
+        });
+        
+        showToast('Успех', 'Воркер добавлен', 'success');
+        document.getElementById('newWorkerTelegramId').value = '';
+        document.getElementById('newWorkerUsername').value = '';
+        await loadAdminData();
+    } catch (error) {
+        console.error('Ошибка добавления воркера:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Удалить воркера
+ */
+async function removeWorker(telegramId) {
+    if (!confirm('Удалить этого воркера?')) return;
+    
+    try {
+        await apiRequest('/admin/workers/remove', {
+            method: 'POST',
+            body: JSON.stringify({
+                admin_telegram_id: state.user.telegram_id,
+                worker_telegram_id: telegramId
+            })
+        });
+        
+        showToast('Успех', 'Воркер удален', 'success');
+        await loadAdminData();
+    } catch (error) {
+        console.error('Ошибка удаления воркера:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Обновить количество сделок (админ)
+ */
+async function updateDealsCount() {
+    const input = document.getElementById('adminDealsInput');
+    const count = parseInt(input?.value) || 0;
+    
+    if (count >= 0) {
+        state.user.stats.completedDeals = count;
+        updateProfileStats();
+        showToast('Успех', 'Количество сделок обновлено', 'success');
+    }
+}
+
+/**
+ * Добавить оборот (админ)
+ */
+async function addVolume() {
+    const input = document.getElementById('adminVolumeInput');
+    const value = input?.value.trim();
+    
+    if (!value) return;
+    
+    const match = value.match(/([A-Z]{3}):(\d+(?:\.\d+)?)/i);
+    if (!match) {
+        showToast('Ошибка', 'Используйте формат: USD:100', 'error');
+        return;
+    }
+    
+    const currency = match[1].toUpperCase();
+    const amount = parseFloat(match[2]);
+    
+    if (!state.user.stats.volumes) {
+        state.user.stats.volumes = {};
+    }
+    
+    state.user.stats.volumes[currency] = (state.user.stats.volumes[currency] || 0) + amount;
+    updateProfileStats();
+    showToast('Успех', 'Оборот добавлен', 'success');
+    input.value = '';
 }
 
 // ============================================
