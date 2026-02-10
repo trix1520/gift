@@ -1,7 +1,10 @@
-// ============================================
+// ============================================
 // GiftMarket P2P Escrow Platform
-// Основной JavaScript файл - ПОЛНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ
+// Основной JavaScript файл - ИСПРАВЛЕННАЯ ВЕРСИЯ
 // ============================================
+
+// УДАЛИТЕ ЭТУ СТРОКУ: let currentLanguage = 'ru'; 
+// currentLanguage уже объявлен в translations.js
 
 // Конфигурация API
 const API_CONFIG = {
@@ -31,7 +34,6 @@ const API_CONFIG = {
 };
 
 // Глобальные переменные
-let currentLanguage = 'ru';
 const state = {
     user: {
         id: null,
@@ -178,10 +180,17 @@ async function initApp() {
     // Настройка слушателей событий
     setupEventListeners();
     
-    // Загрузка языка
+    // Загрузка языка (теперь это делается в translations.js)
+    // Обновляем активные кнопки языков
     const savedLang = localStorage.getItem('language') || 'ru';
-    currentLanguage = savedLang;
-    applyLanguage(savedLang);
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-lang') === savedLang) {
+            btn.classList.add('active');
+        }
+    });
+    
+    document.documentElement.lang = savedLang === 'ru' ? 'ru' : 'en';
     
     // Инициализация пользователя
     await initUser();
@@ -210,39 +219,9 @@ function setupEventListeners() {
     });
 }
 
-// ============================================
-// Язык и переводы
-// ============================================
-
-function switchLanguage(lang) {
-    currentLanguage = lang;
-    localStorage.setItem('language', lang);
-    applyLanguage(lang);
-}
-
-function applyLanguage(lang) {
-    // Обновляем активные кнопки языков
-    document.querySelectorAll('.lang-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.getAttribute('data-lang') === lang) {
-            btn.classList.add('active');
-        }
-    });
-    
-    // Устанавливаем язык документа
-    document.documentElement.lang = lang === 'ru' ? 'ru' : 'en';
-    
-    // Обновляем текст на странице
-    updatePageTranslations();
-}
-
-function updatePageTranslations() {
-    // Этот метод должен быть реализован в translations.js
-    // Если translations.js не загружен, игнорируем
-    if (typeof updateTranslations === 'function') {
-        updateTranslations(currentLanguage);
-    }
-}
+// УДАЛИТЕ функцию switchLanguage из script.js - она теперь в translations.js
+// УДАЛИТЕ функцию applyLanguage из script.js - она теперь в translations.js
+// УДАЛИТЕ функцию updatePageTranslations из script.js - она теперь в translations.js
 
 // ============================================
 // Работа с пользователем
@@ -1195,23 +1174,7 @@ function showOrderDetailsModal(orderId) {
 // ============================================
 
 function setupAdminPanel() {
-    // Кнопка обновления количества сделок
-    const updateDealsBtn = document.querySelector('[onclick="updateDealsCount()"]');
-    if (updateDealsBtn) {
-        updateDealsBtn.addEventListener('click', updateDealsCount);
-    }
-    
-    // Кнопка добавления оборота
-    const addVolumeBtn = document.querySelector('[onclick="addVolume()"]');
-    if (addVolumeBtn) {
-        addVolumeBtn.addEventListener('click', addVolume);
-    }
-    
-    // Кнопка добавления воркера
-    const addWorkerBtn = document.querySelector('[onclick="addNewWorker()"]');
-    if (addWorkerBtn) {
-        addWorkerBtn.addEventListener('click', addNewWorker);
-    }
+    // Кнопки админ-панели уже настроены через onclick в HTML
 }
 
 async function loadAdminData() {
