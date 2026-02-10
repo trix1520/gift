@@ -1304,3 +1304,698 @@ function addDealToHistory(deal) {
         dealsHistory.removeChild(dealsHistory.lastChild);
     }
 }
+
+// ============================================
+// Добавьте этот код в конец существующего script.js
+// после функции addDealToHistory()
+// ============================================
+
+/**
+ * Обновление курса TON
+ */
+async function updateTonPrice() {
+    try {
+        const data = await apiRequest(API_CONFIG.endpoints.tonPrice);
+        state.tonPrice = parseFloat(data.price);
+        
+        const tonPriceValue = document.getElementById('tonPriceValue');
+        if (tonPriceValue) {
+            tonPriceValue.textContent = state.tonPrice.toFixed(2);
+        }
+        
+        state.exchangeRates.TON = state.tonPrice;
+    } catch (error) {
+        console.error('Ошибка обновления курса TON:', error);
+    }
+}
+
+/**
+ * Показать toast-уведомление
+ */
+function showToast(title, message, type = 'info') {
+    const toastContainer = document.getElementById('toastContainer');
+    if (!toastContainer) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    toast.innerHTML = `
+        <div class="toast-title">${title}</div>
+        <div class="toast-message">${message}</div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // Автоматическое удаление через 5 секунд
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100px)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 300);
+    }, 5000);
+}
+
+/**
+ * Показать модальное окно
+ */
+function showModal(title, content) {
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    
+    if (!modal || !modalTitle || !modalBody) return;
+    
+    modalTitle.textContent = title;
+    modalBody.innerHTML = content;
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    
+    // Блокируем скролл под модальным окном
+    document.body.style.overflow = 'hidden';
+}
+
+/**
+ * Закрыть модальное окно
+ */
+function closeModal() {
+    const modal = document.getElementById('modal');
+    if (!modal) return;
+    
+    modal.classList.remove('active');
+    modal.classList.add('hidden');
+    
+    // Разблокируем скролл
+    document.body.style.overflow = '';
+}
+
+/**
+ * Проверка ордера из URL параметра
+ */
+async function checkOrderFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderCode = urlParams.get('order');
+    
+    if (!orderCode) return;
+    
+    try {
+        const order = await apiRequest(API_CONFIG.endpoints.order(orderCode));
+        
+        if (order) {
+            showPage('orders');
+            
+            if (order.seller_telegram_id === state.user.telegram_id) {
+                // Это ордер продавца
+                showToast(t('info'), 'Это ваш ордер', 'info');
+            } else if (!order.buyer_telegram_id) {
+                // Покупатель может присоединиться
+                showModal(t('acceptOrder'), `
+                    <div class="modal-info-box">
+                        <p><strong>${t('type')}</strong> ${t(order.type)}</p>
+                        <p><strong>${t('amount')}</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                        <p><strong>${t('description')}</strong> ${order.description}</p>
+                        <p><strong>${t('forPayment')}</strong></p>
+                        <p style="word-break: break-all;">${order.seller_requisites}</p>
+                    </div>
+                    <p>${t('paymentInstructions')}</p>
+                    <button class="btn btn-primary btn-full" onclick="joinOrder(${order.id})">
+                        ${t('acceptOrder')}
+                    </button>
+                `);
+            } else if (order.buyer_telegram_id === state.user.telegram_id) {
+                // Это покупатель уже присоединился
+                showToast(t('info'), 'Вы уже присоединились к этому ордеру', 'info');
+            } else {
+                showToast(t('warning'), 'У этого ордера уже есть покупатель', 'warning');
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки ордера:', error);
+    }
+}
+
+/**
+ * Присоединиться к ордеру (покупатель)
+ */
+async function joinOrder(orderId) {
+    try {
+        const order = await apiRequest(API_CONFIG.endpoints.orderJoin(orderId), {
+            method: 'POST',
+            body: JSON.stringify({
+                buyer_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        showToast(t('success'), t('connectedToOrder'), 'success');
+        closeModal();
+        await loadUserOrders();
+    } catch (error) {
+        console.error('Ошибка присоединения к ордеру:', error);
+        showToast(t('error'), error.message, 'error');
+    }
+}
+
+/**
+ * Показать детали ордера в модальном окне
+ */
+async function showOrderDetailsModal(orderId) {
+    try {
+        const order = state.orders.find(o => o.id === orderId);
+        if (!order) return;
+        
+        const isSeller = order.seller_telegram_id === state.user.telegram_id;
+        const isBuyer = order.buyer_telegram_id === state.user.telegram_id;
+        
+        let typeText = '';
+        switch(order.type) {
+            case 'nft_gift': typeText = t('nftGift'); break;
+            case 'nft_username': typeText = t('nftUsername'); break;
+            case 'nft_number': typeText = t('nftNumber'); break;
+            default: typeText = order.type;
+        }
+        
+        let paymentText = '';
+        switch(order.payment_method) {
+            case 'ton': paymentText = t('tonWallet'); break;
+            case 'card': paymentText = t('bankCard'); break;
+            case 'stars': paymentText = t('telegramStars'); break;
+            default: paymentText = order.payment_method;
+        }
+        
+        const modalContent = `
+            <div class="modal-info-box">
+                <p><strong>${t('code')}</strong> ${order.code}</p>
+                <p><strong>${t('type')}</strong> ${typeText}</p>
+                <p><strong>${t('payment')}</strong> ${paymentText}</p>
+                <p><strong>${t('amount')}</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                <p><strong>${t('description')}</strong> ${order.description}</p>
+                <p><strong>Статус:</strong> ${order.status}</p>
+                <p><strong>Создан:</strong> ${new Date(order.created_at).toLocaleString()}</p>
+                <p><strong>Продавец:</strong> ${order.seller_username}</p>
+                ${order.buyer_username ? `<p><strong>Покупатель:</strong> ${order.buyer_username}</p>` : ''}
+            </div>
+            
+            ${isSeller && order.status === 'paid' ? `
+                <div class="modal-info-box">
+                    <h4>${t('confirmTransferTitle')}</h4>
+                    <p>${t('confirmTransferText')}</p>
+                    <p><strong>${t('deal')}</strong> #${order.code}</p>
+                    <p class="form-hint">${t('confirmTransferNote')}</p>
+                    <div class="modal-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button class="btn btn-secondary" onclick="closeModal()">
+                            ${t('cancel')}
+                        </button>
+                        <button class="btn btn-success" onclick="confirmTransfer(${order.id}); closeModal();">
+                            ${t('confirm')}
+                        </button>
+                    </div>
+                </div>
+            ` : ''}
+            
+            ${isBuyer && order.status === 'active' ? `
+                <div class="modal-info-box">
+                    <h4>${t('forPayment')}</h4>
+                    <p style="word-break: break-all; font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 6px;">
+                        ${order.seller_requisites}
+                    </p>
+                    <p class="form-hint">${t('paymentInstructions')}</p>
+                    <button class="btn btn-primary btn-full" onclick="confirmPayment(${order.id}); closeModal();">
+                        ${t('iPaid')}
+                    </button>
+                </div>
+            ` : ''}
+        `;
+        
+        showModal(`Ордер #${order.code}`, modalContent);
+    } catch (error) {
+        console.error('Ошибка загрузки деталей ордера:', error);
+    }
+}
+
+/**
+ * Админ: подтвердить оплату
+ */
+async function adminConfirmPayment(orderId) {
+    try {
+        const order = await apiRequest(API_CONFIG.endpoints.fakePayment(orderId), {
+            method: 'POST',
+            body: JSON.stringify({
+                worker_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        showToast(t('success'), 'Оплата подтверждена администратором', 'success');
+        await loadUserOrders();
+    } catch (error) {
+        console.error('Ошибка подтверждения оплаты админом:', error);
+        showToast(t('error'), error.message, 'error');
+    }
+}
+
+/**
+ * Настройка админ-триггера (для открытия админ-панели)
+ */
+function setupAdminTrigger() {
+    // Секретное сочетание для открытия админ-панели
+    let clickCount = 0;
+    const profileHeader = document.querySelector('#page-profile .page-header');
+    
+    if (profileHeader) {
+        profileHeader.addEventListener('click', () => {
+            clickCount++;
+            
+            if (clickCount >= 5) {
+                if (state.user.role === 'admin') {
+                    document.getElementById('adminPanel')?.classList.remove('hidden');
+                    showToast('👑 Админ', 'Панель администратора открыта', 'success');
+                } else if (state.user.role === 'worker') {
+                    document.getElementById('workerPanel')?.classList.remove('hidden');
+                    showToast('🛠️ Воркер', 'Панель воркера открыта', 'success');
+                } else {
+                    showToast('Информация', 'Вы не являетесь администратором или воркером', 'info');
+                }
+                clickCount = 0;
+            }
+        });
+    }
+}
+
+/**
+ * Обновить количество сделок (админ)
+ */
+async function updateDealsCount() {
+    const input = document.getElementById('adminDealsInput');
+    const count = parseInt(input.value) || 0;
+    
+    if (count >= 0) {
+        state.user.stats.completedDeals = count;
+        updateProfileStats();
+        showToast(t('success'), t('dealsCountUpdated'), 'success');
+    }
+}
+
+/**
+ * Добавить оборот (админ)
+ */
+async function addVolume() {
+    const input = document.getElementById('adminVolumeInput');
+    const value = input.value.trim();
+    
+    if (!value) return;
+    
+    const match = value.match(/([A-Z]{3}):(\d+(?:\.\d+)?)/i);
+    if (!match) {
+        showToast(t('error'), 'Используйте формат: USD:100', 'error');
+        return;
+    }
+    
+    const currency = match[1].toUpperCase();
+    const amount = parseFloat(match[2]);
+    
+    if (!state.user.stats.volumes) {
+        state.user.stats.volumes = {};
+    }
+    
+    state.user.stats.volumes[currency] = (state.user.stats.volumes[currency] || 0) + amount;
+    updateProfileStats();
+    showToast(t('success'), t('volumeAdded'), 'success');
+    input.value = '';
+}
+
+/**
+ * Загрузить админ-данные
+ */
+async function loadAdminData() {
+    if (state.user.role !== 'admin') return;
+    
+    try {
+        // Загрузка пользователей
+        const users = await apiRequest(API_CONFIG.endpoints.adminUsers + `?admin_telegram_id=${state.user.telegram_id}`);
+        updateAdminUsersList(users);
+        
+        // Загрузка воркеров
+        const workers = await apiRequest(API_CONFIG.endpoints.adminWorkers + `?admin_telegram_id=${state.user.telegram_id}`);
+        updateAdminWorkersList(workers);
+        
+        // Загрузка статистики платформы
+        const stats = await apiRequest(API_CONFIG.endpoints.adminStats + `?admin_telegram_id=${state.user.telegram_id}`);
+        updatePlatformStats(stats);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки админ-данных:', error);
+    }
+}
+
+/**
+ * Обновить список пользователей в админ-панели
+ */
+function updateAdminUsersList(users) {
+    const usersList = document.getElementById('adminUsersList');
+    if (!usersList) return;
+    
+    usersList.innerHTML = '';
+    
+    users.slice(0, 20).forEach(user => {
+        const userCard = document.createElement('div');
+        userCard.className = 'admin-user-card';
+        userCard.style.borderLeftColor = user.role === 'admin' ? '#6c5ce7' : 
+                                       user.role === 'worker' ? '#fab1a0' : '#667eea';
+        
+        let totalVolumeUSD = 0;
+        if (user.total_volume) {
+            Object.entries(user.total_volume).forEach(([currency, amount]) => {
+                totalVolumeUSD += convertToUSD(amount, currency);
+            });
+        }
+        
+        userCard.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 5px;">
+                ${user.username} 
+                <span style="float: right; font-size: 0.8em; background: #eee; padding: 2px 6px; border-radius: 10px;">
+                    ${user.role}
+                </span>
+            </div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
+                ID: ${user.telegram_id}
+            </div>
+            <div style="font-size: 0.85em;">
+                Сделок: ${user.completed_deals || 0} | Объём: $${totalVolumeUSD.toFixed(2)}
+            </div>
+        `;
+        
+        usersList.appendChild(userCard);
+    });
+}
+
+/**
+ * Обновить список воркеров в админ-панели
+ */
+function updateAdminWorkersList(workers) {
+    const workersList = document.getElementById('adminWorkersList');
+    if (!workersList) return;
+    
+    workersList.innerHTML = '';
+    
+    if (workers.length === 0) {
+        workersList.innerHTML = '<p class="empty-text">Нет воркеров</p>';
+        return;
+    }
+    
+    workers.forEach(worker => {
+        const workerCard = document.createElement('div');
+        workerCard.className = 'admin-worker-card';
+        workerCard.style.borderLeftColor = '#fab1a0';
+        
+        let totalVolumeUSD = 0;
+        if (worker.total_volume) {
+            Object.entries(worker.total_volume).forEach(([currency, amount]) => {
+                totalVolumeUSD += convertToUSD(amount, currency);
+            });
+        }
+        
+        workerCard.innerHTML = `
+            <div style="font-weight: 600; margin-bottom: 5px;">
+                ${worker.username}
+            </div>
+            <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
+                ID: ${worker.telegram_id}
+            </div>
+            <div style="font-size: 0.85em; margin-bottom: 10px;">
+                Сделок: ${worker.completed_deals || 0} | Объём: $${totalVolumeUSD.toFixed(2)}
+            </div>
+            <button class="btn btn-danger btn-small" onclick="removeWorker('${worker.telegram_id}')">
+                <i class="fas fa-trash"></i> Удалить
+            </button>
+        `;
+        
+        workersList.appendChild(workerCard);
+    });
+}
+
+/**
+ * Обновить статистику платформы
+ */
+function updatePlatformStats(stats) {
+    document.getElementById('totalUsers').textContent = stats.totalUsers;
+    document.getElementById('totalOrders').textContent = stats.totalOrders;
+    document.getElementById('platformVolume').textContent = `$${parseFloat(stats.totalVolume).toFixed(2)}`;
+}
+
+/**
+ * Добавить нового воркера
+ */
+async function addNewWorker() {
+    const telegramId = document.getElementById('newWorkerTelegramId').value.trim();
+    const username = document.getElementById('newWorkerUsername').value.trim();
+    
+    if (!telegramId) {
+        showToast('Ошибка', 'Введите Telegram ID', 'error');
+        return;
+    }
+    
+    try {
+        await apiRequest(API_CONFIG.endpoints.addWorker, {
+            method: 'POST',
+            body: JSON.stringify({
+                admin_telegram_id: state.user.telegram_id,
+                worker_telegram_id: telegramId,
+                worker_username: username || 'Новый воркер'
+            })
+        });
+        
+        showToast('Успех', 'Воркер добавлен', 'success');
+        document.getElementById('newWorkerTelegramId').value = '';
+        document.getElementById('newWorkerUsername').value = '';
+        await loadAdminData();
+    } catch (error) {
+        console.error('Ошибка добавления воркера:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Удалить воркера
+ */
+async function removeWorker(telegramId) {
+    if (!confirm('Удалить этого воркера?')) return;
+    
+    try {
+        await apiRequest(API_CONFIG.endpoints.removeWorker, {
+            method: 'POST',
+            body: JSON.stringify({
+                admin_telegram_id: state.user.telegram_id,
+                worker_telegram_id: telegramId
+            })
+        });
+        
+        showToast('Успех', 'Воркер удален', 'success');
+        await loadAdminData();
+    } catch (error) {
+        console.error('Ошибка удаления воркера:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Показать активные ордера для воркера
+ */
+async function showActiveOrdersForWorker() {
+    const activeOrders = state.orders.filter(o => o.status === 'active');
+    
+    if (activeOrders.length === 0) {
+        showToast('Информация', 'Нет активных ордеров', 'info');
+        return;
+    }
+    
+    let ordersHtml = '';
+    activeOrders.forEach(order => {
+        const isParticipant = order.seller_telegram_id === state.user.telegram_id || 
+                             order.buyer_telegram_id === state.user.telegram_id;
+        
+        if (!isParticipant) {
+            ordersHtml += `
+                <div class="modal-info-box">
+                    <p><strong>#${order.code}</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                    <p>${order.description}</p>
+                    <p>Продавец: ${order.seller_username}</p>
+                    ${order.buyer_username ? `<p>Покупатель: ${order.buyer_username}</p>` : '<p>Ожидает покупателя</p>'}
+                    <div class="modal-actions" style="margin-top: 10px; display: flex; gap: 10px;">
+                        <button class="btn btn-primary btn-small" onclick="adminConfirmPayment(${order.id}); closeModal();">
+                            Подтвердить оплату
+                        </button>
+                        <button class="btn btn-success btn-small" onclick="fastCompleteOrder(${order.id}); closeModal();">
+                            Быстро завершить
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    if (!ordersHtml) {
+        ordersHtml = '<p class="empty-text">Нет доступных ордеров для управления</p>';
+    }
+    
+    showModal('Активные ордера для воркера', ordersHtml);
+}
+
+/**
+ * Быстро завершить сделку (воркер)
+ */
+async function fastCompleteOrder(orderId) {
+    try {
+        await apiRequest(API_CONFIG.endpoints.fastComplete(orderId), {
+            method: 'POST',
+            body: JSON.stringify({
+                worker_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        showToast('Успех', 'Сделка быстро завершена', 'success');
+        await loadUserOrders();
+        await initUser();
+    } catch (error) {
+        console.error('Ошибка быстрого завершения:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Показать быстрое завершение (воркер)
+ */
+function showQuickCompletion() {
+    showModal('Быстрое завершение сделки', `
+        <div class="modal-info-box">
+            <p>Введите код ордера для быстрого завершения:</p>
+            <input type="text" id="quickCompleteCode" class="form-input" placeholder="Код ордера" style="margin: 10px 0;">
+            <button class="btn btn-success btn-full" onclick="quickCompleteByCode()">
+                Быстро завершить
+            </button>
+        </div>
+        <p class="form-hint">Это действие мгновенно завершит сделку без подтверждения оплаты и передачи актива.</p>
+    `);
+}
+
+/**
+ * Быстро завершить по коду
+ */
+async function quickCompleteByCode() {
+    const codeInput = document.getElementById('quickCompleteCode');
+    const code = codeInput.value.trim().toUpperCase();
+    
+    if (!code) {
+        showToast('Ошибка', 'Введите код ордера', 'error');
+        return;
+    }
+    
+    try {
+        const order = await apiRequest(API_CONFIG.endpoints.order(code));
+        
+        if (!order) {
+            showToast('Ошибка', 'Ордер не найден', 'error');
+            return;
+        }
+        
+        await apiRequest(API_CONFIG.endpoints.fastComplete(order.id), {
+            method: 'POST',
+            body: JSON.stringify({
+                worker_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        showToast('Успех', `Сделка #${code} быстро завершена`, 'success');
+        closeModal();
+        await loadUserOrders();
+        await initUser();
+    } catch (error) {
+        console.error('Ошибка быстрого завершения:', error);
+        showToast('Ошибка', error.message, 'error');
+    }
+}
+
+/**
+ * Запуск опроса уведомлений
+ */
+function startNotificationPolling() {
+    state.intervals.notifications = setInterval(async () => {
+        if (state.user.telegram_id) {
+            await checkNotifications();
+        }
+    }, 30000); // Каждые 30 секунд
+}
+
+/**
+ * Проверить уведомления
+ */
+async function checkNotifications() {
+    try {
+        const notifications = await apiRequest(
+            API_CONFIG.endpoints.notifications(state.user.telegram_id)
+        );
+        
+        // Проверяем непрочитанные уведомления
+        const unread = notifications.filter(n => !n.read);
+        
+        unread.forEach(notification => {
+            showToast('Новое уведомление', notification.message, 'info');
+            
+            // Помечаем как прочитанное
+            apiRequest(`/api/notifications/${notification.id}/read`, {
+                method: 'PUT'
+            }).catch(console.error);
+        });
+        
+        // Обновляем счетчик уведомлений, если он есть
+        updateNotificationBadge(notifications.length);
+        
+    } catch (error) {
+        console.error('Ошибка проверки уведомлений:', error);
+    }
+}
+
+/**
+ * Обновить бейдж уведомлений
+ */
+function updateNotificationBadge(count) {
+    const navItem = document.querySelector('.bottom-nav-item[data-page="profile"]');
+    if (!navItem) return;
+    
+    let badge = navItem.querySelector('.notification-badge');
+    
+    if (count > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'notification-badge';
+            navItem.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? '99+' : count;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+/**
+ * Переключение языка
+ */
+function switchLanguage(lang) {
+    if (currentLanguage === lang) return;
+    
+    currentLanguage = lang;
+    localStorage.setItem('language', lang);
+    
+    // Обновляем активные кнопки
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-lang') === lang) {
+            btn.classList.add('active');
+        }
+    });
+    
+    document.documentElement.lang = lang;
+    updatePageTranslations();
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', initApp);
