@@ -1,6 +1,6 @@
 // ============================================
 // GiftMarket P2P Escrow Platform
-// Основной JavaScript файл
+// Основной JavaScript файл - ИСПРАВЛЕННАЯ ВЕРСИЯ
 // ============================================
 
 // Конфигурация API
@@ -31,6 +31,7 @@ const API_CONFIG = {
 };
 
 // Глобальные переменные
+let currentLanguage = 'ru'; // ДОБАВЛЕНО: инициализация переменной языка
 const state = {
     user: {
         id: null,
@@ -82,7 +83,9 @@ const state = {
  * Форматирование чисел с разделителями
  */
 function formatNumber(num, decimals = 2) {
-    return parseFloat(num).toLocaleString('ru-RU', {
+    const number = parseFloat(num);
+    if (isNaN(number)) return '0.00';
+    return number.toLocaleString('ru-RU', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals
     });
@@ -136,11 +139,13 @@ function isOnline() {
  * Показ/скрытие лоадера
  */
 function showLoader() {
-    document.getElementById('loadingOverlay')?.classList.remove('hidden');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.remove('hidden');
 }
 
 function hideLoader() {
-    document.getElementById('loadingOverlay')?.classList.add('hidden');
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) overlay.classList.add('hidden');
 }
 
 /**
@@ -174,10 +179,14 @@ async function apiRequest(endpoint, options = {}) {
         const response = await fetch(url, defaultOptions);
         
         if (!response.ok) {
-            const error = await response.json().catch(() => ({
-                error: `Ошибка ${response.status}: ${response.statusText}`
-            }));
-            throw new Error(error.error || 'Ошибка сервера');
+            let errorText;
+            try {
+                const errorData = await response.json();
+                errorText = errorData.error || `Ошибка ${response.status}: ${response.statusText}`;
+            } catch {
+                errorText = `Ошибка ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorText);
         }
         
         return await response.json();
@@ -186,11 +195,11 @@ async function apiRequest(endpoint, options = {}) {
         
         // Проверяем тип ошибки
         if (!isOnline()) {
-            showToast(t('error'), 'Нет подключения к интернету', 'error');
+            showToast('Ошибка', 'Нет подключения к интернету', 'error');
         } else if (error.message.includes('Failed to fetch')) {
-            showToast(t('error'), 'Не удалось подключиться к серверу', 'error');
+            showToast('Ошибка', 'Не удалось подключиться к серверу', 'error');
         } else {
-            showToast(t('error'), error.message, 'error');
+            showToast('Ошибка', error.message, 'error');
         }
         
         throw error;
@@ -265,48 +274,6 @@ function setupEventListeners() {
     window.addEventListener('offline', () => {
         showToast('⚠️ Отсутствует подключение', 'Вы работаете в офлайн режиме', 'warning');
     });
-    
-    // Предотвращение скрытия пароля
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-            updateTonPrice();
-        }
-    });
-    
-    // Обработка жестов на мобильных устройствах
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    document.addEventListener('touchstart', e => {
-        touchStartX = e.changedTouches[0].screenX;
-    });
-    
-    document.addEventListener('touchend', e => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe(touchStartX, touchEndX);
-    });
-}
-
-/**
- * Обработка свайпов для навигации
- */
-function handleSwipe(startX, endX) {
-    const swipeThreshold = 50;
-    const diff = endX - startX;
-    
-    if (Math.abs(diff) > swipeThreshold) {
-        const pages = ['home', 'requisites', 'orders', 'profile', 'support'];
-        const currentPage = document.querySelector('.page.active').id.replace('page-', '');
-        const currentIndex = pages.indexOf(currentPage);
-        
-        if (diff > 0 && currentIndex > 0) {
-            // Свайп вправо - предыдущая страница
-            showPage(pages[currentIndex - 1]);
-        } else if (diff < 0 && currentIndex < pages.length - 1) {
-            // Свайп влево - следующая страница
-            showPage(pages[currentIndex + 1]);
-        }
-    }
 }
 
 // ============================================
@@ -340,7 +307,7 @@ async function initUser() {
             id: userData.id,
             telegram_id: userData.telegram_id,
             username: userData.username,
-            role: userData.role,
+            role: userData.role || 'user',
             requisites: {
                 tonWallet: userData.ton_wallet,
                 card: userData.card_number,
@@ -349,7 +316,7 @@ async function initUser() {
                 telegram: userData.telegram_username
             },
             stats: {
-                completedDeals: userData.completed_deals,
+                completedDeals: userData.completed_deals || 0,
                 volumes: userData.volumes || {}
             }
         });
@@ -387,14 +354,16 @@ async function initUser() {
  */
 async function loadUserOrders() {
     try {
-        const orders = await apiRequest(
-            API_CONFIG.endpoints.notifications(state.user.telegram_id).replace('/notifications', '/orders')
+        const response = await apiRequest(
+            `/api/users/${state.user.telegram_id}/orders`
         );
         
-        state.orders = orders;
+        state.orders = response;
         updateOrdersList();
     } catch (error) {
         console.error('Ошибка загрузки ордеров:', error);
+        state.orders = [];
+        updateOrdersList();
     }
 }
 
@@ -407,8 +376,15 @@ async function loadUserOrders() {
  */
 function updateUserInterface() {
     // Обновляем информацию о пользователе
-    document.getElementById('userTelegramId').textContent = `ID: ${state.user.telegram_id}`;
-    document.getElementById('userName').textContent = state.user.username;
+    const userTelegramIdElement = document.getElementById('userTelegramId');
+    if (userTelegramIdElement) {
+        userTelegramIdElement.textContent = `ID: ${state.user.telegram_id}`;
+    }
+    
+    const userNameElement = document.getElementById('userName');
+    if (userNameElement) {
+        userNameElement.textContent = state.user.username;
+    }
     
     // Обновляем роль пользователя
     const roleBadge = document.querySelector('.role-badge');
@@ -425,15 +401,20 @@ function updateUserInterface() {
     updateProfileStats();
     
     // Показываем/скрываем панели админа/воркера
-    if (state.user.role === 'admin') {
-        document.getElementById('adminPanel')?.classList.remove('hidden');
-        document.getElementById('workerPanel')?.classList.add('hidden');
-    } else if (state.user.role === 'worker') {
-        document.getElementById('adminPanel')?.classList.add('hidden');
-        document.getElementById('workerPanel')?.classList.remove('hidden');
-    } else {
-        document.getElementById('adminPanel')?.classList.add('hidden');
-        document.getElementById('workerPanel')?.classList.add('hidden');
+    const adminPanel = document.getElementById('adminPanel');
+    const workerPanel = document.getElementById('workerPanel');
+    
+    if (adminPanel && workerPanel) {
+        if (state.user.role === 'admin') {
+            adminPanel.classList.remove('hidden');
+            workerPanel.classList.add('hidden');
+        } else if (state.user.role === 'worker') {
+            adminPanel.classList.add('hidden');
+            workerPanel.classList.remove('hidden');
+        } else {
+            adminPanel.classList.add('hidden');
+            workerPanel.classList.add('hidden');
+        }
     }
 }
 
@@ -443,42 +424,60 @@ function updateUserInterface() {
 function updateRequisitesUI() {
     // TON кошелек
     const tonWallet = state.user.requisites.tonWallet;
-    if (tonWallet) {
-        document.getElementById('tonStatus').textContent = t('added');
-        document.getElementById('tonStatus').className = 'status active';
-        document.getElementById('tonWalletAddress').textContent = tonWallet;
-        document.getElementById('tonWalletDisplay').classList.remove('hidden');
-        document.getElementById('tonWalletForm').classList.add('hidden');
-    } else {
-        document.getElementById('tonWalletDisplay').classList.add('hidden');
-        document.getElementById('tonWalletForm').classList.remove('hidden');
+    const tonStatus = document.getElementById('tonStatus');
+    const tonWalletDisplay = document.getElementById('tonWalletDisplay');
+    const tonWalletForm = document.getElementById('tonWalletForm');
+    
+    if (tonStatus && tonWalletDisplay && tonWalletForm) {
+        if (tonWallet) {
+            tonStatus.textContent = 'Добавлен';
+            tonStatus.className = 'status active';
+            document.getElementById('tonWalletAddress').textContent = tonWallet;
+            tonWalletDisplay.classList.remove('hidden');
+            tonWalletForm.classList.add('hidden');
+        } else {
+            tonWalletDisplay.classList.add('hidden');
+            tonWalletForm.classList.remove('hidden');
+        }
     }
     
     // Банковская карта
     const card = state.user.requisites.card;
-    if (card) {
-        document.getElementById('cardStatus').textContent = t('addedFemale');
-        document.getElementById('cardStatus').className = 'status active';
-        const cardInfo = `${card}${state.user.requisites.cardBank ? ' (' + state.user.requisites.cardBank + ')' : ''}`;
-        document.getElementById('cardInfo').textContent = cardInfo + ' (' + state.user.requisites.cardCurrency + ')';
-        document.getElementById('cardDisplay').classList.remove('hidden');
-        document.getElementById('cardForm').classList.add('hidden');
-    } else {
-        document.getElementById('cardDisplay').classList.add('hidden');
-        document.getElementById('cardForm').classList.remove('hidden');
+    const cardStatus = document.getElementById('cardStatus');
+    const cardDisplay = document.getElementById('cardDisplay');
+    const cardForm = document.getElementById('cardForm');
+    
+    if (cardStatus && cardDisplay && cardForm) {
+        if (card) {
+            cardStatus.textContent = 'Добавлена';
+            cardStatus.className = 'status active';
+            const cardInfo = `${card}${state.user.requisites.cardBank ? ' (' + state.user.requisites.cardBank + ')' : ''}`;
+            document.getElementById('cardInfo').textContent = cardInfo + ' (' + (state.user.requisites.cardCurrency || 'RUB') + ')';
+            cardDisplay.classList.remove('hidden');
+            cardForm.classList.add('hidden');
+        } else {
+            cardDisplay.classList.add('hidden');
+            cardForm.classList.remove('hidden');
+        }
     }
     
     // Telegram
     const telegram = state.user.requisites.telegram;
-    if (telegram) {
-        document.getElementById('telegramStatus').textContent = t('added');
-        document.getElementById('telegramStatus').className = 'status active';
-        document.getElementById('telegramUsername').textContent = telegram;
-        document.getElementById('telegramDisplay').classList.remove('hidden');
-        document.getElementById('telegramForm').classList.add('hidden');
-    } else {
-        document.getElementById('telegramDisplay').classList.add('hidden');
-        document.getElementById('telegramForm').classList.remove('hidden');
+    const telegramStatus = document.getElementById('telegramStatus');
+    const telegramDisplay = document.getElementById('telegramDisplay');
+    const telegramForm = document.getElementById('telegramForm');
+    
+    if (telegramStatus && telegramDisplay && telegramForm) {
+        if (telegram) {
+            telegramStatus.textContent = 'Добавлен';
+            telegramStatus.className = 'status active';
+            document.getElementById('telegramUsername').textContent = telegram;
+            telegramDisplay.classList.remove('hidden');
+            telegramForm.classList.add('hidden');
+        } else {
+            telegramDisplay.classList.add('hidden');
+            telegramForm.classList.remove('hidden');
+        }
     }
 }
 
@@ -520,7 +519,7 @@ function updateProfileStats() {
                 currencyStatsElement.appendChild(currencyItem);
             });
         } else {
-            currencyStatsElement.innerHTML = `<p class="empty-text">${t('noData')}</p>`;
+            currencyStatsElement.innerHTML = `<p class="empty-text">Нет данных</p>`;
         }
     }
 }
@@ -591,10 +590,10 @@ function showPage(pageName) {
  */
 async function saveTonWallet() {
     const walletInput = document.getElementById('tonWalletInput');
-    const wallet = walletInput.value.trim();
+    const wallet = walletInput?.value.trim();
     
     if (!wallet) {
-        showToast(t('error'), t('enterWallet'), 'error');
+        showToast('Ошибка', 'Введите адрес TON кошелька', 'error');
         return;
     }
     
@@ -606,7 +605,7 @@ async function saveTonWallet() {
         
         state.user.requisites.tonWallet = user.ton_wallet;
         updateUserInterface();
-        showToast(t('success'), t('tonWalletSaved'), 'success');
+        showToast('Успех', 'TON кошелёк сохранён', 'success');
     } catch (error) {
         console.error('Ошибка сохранения TON кошелька:', error);
     }
@@ -617,22 +616,33 @@ async function saveTonWallet() {
  */
 function editTonWallet() {
     const walletInput = document.getElementById('tonWalletInput');
-    walletInput.value = state.user.requisites.tonWallet || '';
+    if (walletInput) {
+        walletInput.value = state.user.requisites.tonWallet || '';
+    }
     
-    document.getElementById('tonWalletDisplay').classList.add('hidden');
-    document.getElementById('tonWalletForm').classList.remove('hidden');
+    const tonWalletDisplay = document.getElementById('tonWalletDisplay');
+    const tonWalletForm = document.getElementById('tonWalletForm');
+    
+    if (tonWalletDisplay && tonWalletForm) {
+        tonWalletDisplay.classList.add('hidden');
+        tonWalletForm.classList.remove('hidden');
+    }
 }
 
 /**
  * Сохранить банковскую карту
  */
 async function saveCard() {
-    const cardNumber = document.getElementById('cardNumberInput').value.trim();
-    const cardBank = document.getElementById('cardBankInput').value.trim();
-    const cardCurrency = document.getElementById('cardCurrencyInput').value;
+    const cardNumberInput = document.getElementById('cardNumberInput');
+    const cardBankInput = document.getElementById('cardBankInput');
+    const cardCurrencyInput = document.getElementById('cardCurrencyInput');
+    
+    const cardNumber = cardNumberInput?.value.trim();
+    const cardBank = cardBankInput?.value.trim();
+    const cardCurrency = cardCurrencyInput?.value;
     
     if (!cardNumber || !cardBank) {
-        showToast(t('error'), t('fillAllFields'), 'error');
+        showToast('Ошибка', 'Заполните все поля', 'error');
         return;
     }
     
@@ -653,7 +663,7 @@ async function saveCard() {
         });
         
         updateUserInterface();
-        showToast(t('success'), t('bankCardSaved'), 'success');
+        showToast('Успех', 'Банковская карта сохранена', 'success');
     } catch (error) {
         console.error('Ошибка сохранения карты:', error);
     }
@@ -667,18 +677,24 @@ function editCard() {
     document.getElementById('cardBankInput').value = state.user.requisites.cardBank || '';
     document.getElementById('cardCurrencyInput').value = state.user.requisites.cardCurrency || 'RUB';
     
-    document.getElementById('cardDisplay').classList.add('hidden');
-    document.getElementById('cardForm').classList.remove('hidden');
+    const cardDisplay = document.getElementById('cardDisplay');
+    const cardForm = document.getElementById('cardForm');
+    
+    if (cardDisplay && cardForm) {
+        cardDisplay.classList.add('hidden');
+        cardForm.classList.remove('hidden');
+    }
 }
 
 /**
  * Сохранить Telegram
  */
 async function saveTelegram() {
-    const telegram = document.getElementById('telegramInput').value.trim();
+    const telegramInput = document.getElementById('telegramInput');
+    const telegram = telegramInput?.value.trim();
     
     if (!telegram) {
-        showToast(t('error'), 'Введите Telegram username', 'error');
+        showToast('Ошибка', 'Введите Telegram username', 'error');
         return;
     }
     
@@ -692,7 +708,7 @@ async function saveTelegram() {
         
         state.user.requisites.telegram = user.telegram_username;
         updateUserInterface();
-        showToast(t('success'), t('telegramSaved'), 'success');
+        showToast('Успех', 'Telegram сохранен', 'success');
     } catch (error) {
         console.error('Ошибка сохранения Telegram:', error);
     }
@@ -704,12 +720,17 @@ async function saveTelegram() {
 function editTelegram() {
     document.getElementById('telegramInput').value = state.user.requisites.telegram || '';
     
-    document.getElementById('telegramDisplay').classList.add('hidden');
-    document.getElementById('telegramForm').classList.remove('hidden');
+    const telegramDisplay = document.getElementById('telegramDisplay');
+    const telegramForm = document.getElementById('telegramForm');
+    
+    if (telegramDisplay && telegramForm) {
+        telegramDisplay.classList.add('hidden');
+        telegramForm.classList.remove('hidden');
+    }
 }
 
 // ============================================
-// Создание ордеров
+// Создание ордеров - ИСПРАВЛЕННЫЙ РАЗДЕЛ
 // ============================================
 
 /**
@@ -717,8 +738,16 @@ function editTelegram() {
  */
 function setupOrderCreation() {
     // Кнопки создания ордера
-    document.getElementById('createOrderBtn')?.addEventListener('click', showCreateOrderForm);
-    document.getElementById('createOrderBtn2')?.addEventListener('click', showCreateOrderForm);
+    const createOrderBtn = document.getElementById('createOrderBtn');
+    const createOrderBtn2 = document.getElementById('createOrderBtn2');
+    
+    if (createOrderBtn) {
+        createOrderBtn.addEventListener('click', showCreateOrderForm);
+    }
+    
+    if (createOrderBtn2) {
+        createOrderBtn2.addEventListener('click', showCreateOrderForm);
+    }
     
     // Выбор типа сделки
     document.querySelectorAll('[data-type]').forEach(item => {
@@ -742,16 +771,25 @@ function setupOrderCreation() {
     });
     
     // Создание ордера
-    document.getElementById('createOrderSubmit')?.addEventListener('click', createOrder);
+    const createOrderSubmit = document.getElementById('createOrderSubmit');
+    if (createOrderSubmit) {
+        createOrderSubmit.addEventListener('click', createOrder);
+    }
 }
 
 /**
  * Показать форму создания ордера
  */
 function showCreateOrderForm() {
-    document.getElementById('ordersListContainer')?.classList.add('hidden');
-    document.getElementById('ordersList')?.classList.add('hidden');
-    document.getElementById('createOrderForm')?.classList.remove('hidden');
+    showPage('orders');
+    
+    const ordersListContainer = document.getElementById('ordersListContainer');
+    const ordersList = document.getElementById('ordersList');
+    const createOrderForm = document.getElementById('createOrderForm');
+    
+    if (ordersListContainer) ordersListContainer.classList.add('hidden');
+    if (ordersList) ordersList.classList.add('hidden');
+    if (createOrderForm) createOrderForm.classList.remove('hidden');
     
     resetOrderForm();
 }
@@ -760,11 +798,15 @@ function showCreateOrderForm() {
  * Отмена создания ордера
  */
 function cancelOrderCreation() {
-    document.getElementById('ordersListContainer')?.classList.remove('hidden');
-    document.getElementById('createOrderForm')?.classList.add('hidden');
+    const ordersListContainer = document.getElementById('ordersListContainer');
+    const ordersList = document.getElementById('ordersList');
+    const createOrderForm = document.getElementById('createOrderForm');
     
-    if (state.orders.length > 0) {
-        document.getElementById('ordersList')?.classList.remove('hidden');
+    if (ordersListContainer) ordersListContainer.classList.remove('hidden');
+    if (createOrderForm) createOrderForm.classList.add('hidden');
+    
+    if (state.orders.length > 0 && ordersList) {
+        ordersList.classList.remove('hidden');
     }
 }
 
@@ -778,15 +820,21 @@ function resetOrderForm() {
     document.querySelectorAll('.form-step').forEach(step => {
         step.classList.add('hidden');
     });
-    document.getElementById('step1')?.classList.remove('hidden');
+    
+    const step1 = document.getElementById('step1');
+    if (step1) step1.classList.remove('hidden');
     
     document.querySelectorAll('[data-type], [data-payment]').forEach(item => {
         item.classList.remove('selected');
     });
     
-    document.getElementById('orderAmount').value = '';
-    document.getElementById('orderDescription').value = '';
-    document.getElementById('currencyDisplay').textContent = 'RUB';
+    const orderAmount = document.getElementById('orderAmount');
+    const orderDescription = document.getElementById('orderDescription');
+    const currencyDisplay = document.getElementById('currencyDisplay');
+    
+    if (orderAmount) orderAmount.value = '';
+    if (orderDescription) orderDescription.value = '';
+    if (currencyDisplay) currencyDisplay.textContent = 'RUB';
 }
 
 /**
@@ -802,7 +850,10 @@ function updateCurrencyDisplay() {
         currency = 'STARS';
     }
     
-    document.getElementById('currencyDisplay').textContent = currency;
+    const currencyDisplay = document.getElementById('currencyDisplay');
+    if (currencyDisplay) {
+        currencyDisplay.textContent = currency;
+    }
 }
 
 /**
@@ -812,8 +863,12 @@ function nextStep(stepNumber) {
     document.querySelectorAll('.form-step').forEach(step => {
         step.classList.add('hidden');
     });
-    document.getElementById('step' + stepNumber)?.classList.remove('hidden');
-    state.currentStep = stepNumber;
+    
+    const nextStepElement = document.getElementById('step' + stepNumber);
+    if (nextStepElement) {
+        nextStepElement.classList.remove('hidden');
+        state.currentStep = stepNumber;
+    }
 }
 
 /**
@@ -823,41 +878,49 @@ function previousStep(stepNumber) {
     document.querySelectorAll('.form-step').forEach(step => {
         step.classList.add('hidden');
     });
-    document.getElementById('step' + stepNumber)?.classList.remove('hidden');
-    state.currentStep = stepNumber;
+    
+    const prevStepElement = document.getElementById('step' + stepNumber);
+    if (prevStepElement) {
+        prevStepElement.classList.remove('hidden');
+        state.currentStep = stepNumber;
+    }
 }
 
 /**
  * Создание ордера
  */
 async function createOrder() {
-    const amount = document.getElementById('orderAmount').value.trim();
-    const description = document.getElementById('orderDescription').value.trim();
+    const orderAmountInput = document.getElementById('orderAmount');
+    const orderDescriptionInput = document.getElementById('orderDescription');
+    
+    const amount = orderAmountInput?.value.trim();
+    const description = orderDescriptionInput?.value.trim();
     
     // Валидация
     if (!state.currentOrderData.type || !state.currentOrderData.payment_method || !amount || !description) {
-        showToast(t('error'), t('fillAllFields'), 'error');
+        showToast('Ошибка', 'Заполните все поля', 'error');
         return;
     }
     
-    if (parseFloat(amount) <= 0) {
-        showToast(t('error'), 'Сумма должна быть больше нуля', 'error');
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber) || amountNumber <= 0) {
+        showToast('Ошибка', 'Сумма должна быть больше нуля', 'error');
         return;
     }
     
     // Проверка реквизитов
     if (state.currentOrderData.payment_method === 'ton' && !state.user.requisites.tonWallet) {
-        showToast(t('error'), t('addTonWallet'), 'error');
+        showToast('Ошибка', 'Добавьте TON кошелёк в реквизитах', 'error');
         return;
     }
     
     if (state.currentOrderData.payment_method === 'card' && !state.user.requisites.card) {
-        showToast(t('error'), t('addBankCard'), 'error');
+        showToast('Ошибка', 'Добавьте банковскую карту в реквизитах', 'error');
         return;
     }
     
     if (state.currentOrderData.payment_method === 'stars' && !state.user.requisites.telegram) {
-        showToast(t('error'), t('addTelegram'), 'error');
+        showToast('Ошибка', 'Добавьте Telegram в реквизитах', 'error');
         return;
     }
     
@@ -876,27 +939,27 @@ async function createOrder() {
                 seller_telegram_id: state.user.telegram_id,
                 type: state.currentOrderData.type,
                 payment_method: state.currentOrderData.payment_method,
-                amount: parseFloat(amount),
+                amount: amountNumber,
                 currency: currency,
                 description: description
             })
         });
         
         // Показываем модальное окно с информацией
-        showModal(t('orderCreatedTitle'), `
+        showModal('Ордер создан', `
             <div class="modal-info-box">
-                <p><strong>${t('code')}</strong> ${order.code}</p>
-                <p><strong>${t('type')}</strong> ${t(state.currentOrderData.type)}</p>
-                <p><strong>${t('amount')}</strong> ${formatCurrency(order.amount, order.currency)}</p>
-                <p><strong>${t('description')}</strong> ${order.description}</p>
+                <p><strong>Код:</strong> ${order.code}</p>
+                <p><strong>Тип:</strong> ${state.currentOrderData.type}</p>
+                <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                <p><strong>Описание:</strong> ${order.description}</p>
             </div>
             <div class="modal-info-box">
-                <p><strong>${t('buyerLink')}</strong></p>
+                <p><strong>Ссылка для покупателя:</strong></p>
                 <div class="order-link" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 8px; word-break: break-all;">
                     ${window.location.origin}?order=${order.code}
                 </div>
                 <button class="btn btn-primary btn-full" onclick="copyOrderLink('${order.code}'); closeModal();">
-                    <i class="fas fa-copy"></i> ${t('copyLink')}
+                    <i class="fas fa-copy"></i> Скопировать ссылку
                 </button>
             </div>
         `);
@@ -907,6 +970,7 @@ async function createOrder() {
         
     } catch (error) {
         console.error('Ошибка создания ордера:', error);
+        showToast('Ошибка', 'Не удалось создать ордер: ' + error.message, 'error');
     }
 }
 
@@ -951,16 +1015,16 @@ function createOrderCard(order) {
     
     // Определение статуса
     let statusClass = 'status-active';
-    let statusText = t('statusActive');
+    let statusText = 'Активен';
     
     switch (order.status) {
         case 'paid':
             statusClass = 'status-paid';
-            statusText = t('statusPaid');
+            statusText = 'Оплачен';
             break;
         case 'completed':
             statusClass = 'status-completed';
-            statusText = t('statusCompleted');
+            statusText = 'Завершен';
             break;
         case 'cancelled':
             statusClass = 'status-cancelled';
@@ -972,13 +1036,13 @@ function createOrderCard(order) {
     let typeText = '';
     switch(order.type) {
         case 'nft_gift':
-            typeText = t('nftGift');
+            typeText = 'Продажа NFT подарка';
             break;
         case 'nft_username':
-            typeText = t('nftUsername');
+            typeText = 'Продажа NFT username';
             break;
         case 'nft_number':
-            typeText = t('nftNumber');
+            typeText = 'Продажа NFT number';
             break;
         default:
             typeText = order.type;
@@ -988,13 +1052,13 @@ function createOrderCard(order) {
     let paymentText = '';
     switch(order.payment_method) {
         case 'ton':
-            paymentText = t('tonWallet');
+            paymentText = 'TON кошелёк';
             break;
         case 'card':
-            paymentText = t('bankCard');
+            paymentText = 'Банковская карта';
             break;
         case 'stars':
-            paymentText = t('telegramStars');
+            paymentText = 'Telegram Stars';
             break;
         default:
             paymentText = order.payment_method;
@@ -1012,60 +1076,60 @@ function createOrderCard(order) {
         
         <div class="order-details">
             <div class="order-detail">
-                <span class="detail-label">${t('type')}</span>
+                <span class="detail-label">Тип</span>
                 <span class="detail-value">${typeText}</span>
             </div>
             <div class="order-detail">
-                <span class="detail-label">${t('payment')}</span>
+                <span class="detail-label">Оплата</span>
                 <span class="detail-value">${paymentText}</span>
             </div>
             <div class="order-detail">
-                <span class="detail-label">${t('amount')}</span>
+                <span class="detail-label">Сумма</span>
                 <span class="detail-value">${formatCurrency(order.amount, order.currency)}</span>
             </div>
             <div class="order-detail">
-                <span class="detail-label">${t('description')}</span>
+                <span class="detail-label">Описание</span>
                 <span class="detail-value">${order.description}</span>
             </div>
-            ${isSeller ? `
+            ${isSeller && order.seller_requisites ? `
                 <div class="order-detail">
-                    <span class="detail-label">${t('requisitesLabel')}</span>
+                    <span class="detail-label">Реквизиты</span>
                     <span class="detail-value">${order.seller_requisites}</span>
                 </div>
             ` : ''}
         </div>
         
         <div class="order-link">
-            ${t('link')}: ${window.location.origin}?order=${order.code}
+            Ссылка: ${window.location.origin}?order=${order.code}
         </div>
         
         <div class="order-actions">
             ${order.status === 'active' ? `
                 <button class="btn btn-secondary btn-small" onclick="copyOrderLink('${order.code}')">
-                    <i class="fas fa-copy"></i> ${t('copyLink')}
+                    <i class="fas fa-copy"></i> Копировать ссылку
                 </button>
                 ${isBuyer ? `
-                    <button class="btn btn-primary btn-small" onclick="confirmPayment(${order.id})">
-                        <i class="fas fa-check"></i> ${t('iPaid')}
+                    <button class="btn btn-primary btn-small" onclick="confirmPayment('${order.id}')">
+                        <i class="fas fa-check"></i> Я оплатил
                     </button>
                 ` : ''}
                 ${isSeller && order.buyer_telegram_id ? `
-                    <button class="btn btn-success btn-small" onclick="confirmTransfer(${order.id})">
-                        <i class="fas fa-exchange-alt"></i> ${t('assetTransferred')}
+                    <button class="btn btn-success btn-small" onclick="confirmTransfer('${order.id}')">
+                        <i class="fas fa-exchange-alt"></i> Актив передан
                     </button>
                 ` : ''}
                 ${(state.user.role === 'admin' || state.user.role === 'worker') && !isBuyer && !isSeller ? `
-                    <button class="btn btn-warning btn-small" onclick="adminConfirmPayment(${order.id})">
-                        <i class="fas fa-user-shield"></i> ${t('adminPaid')}
+                    <button class="btn btn-warning btn-small" onclick="adminConfirmPayment('${order.id}')">
+                        <i class="fas fa-user-shield"></i> Подтвердить оплату
                     </button>
                 ` : ''}
             ` : ''}
             ${order.status === 'paid' && isBuyer ? `
-                <button class="btn btn-success btn-small" onclick="confirmReceipt(${order.id})">
-                    <i class="fas fa-check-double"></i> ${t('confirmReceipt')}
+                <button class="btn btn-success btn-small" onclick="confirmReceipt('${order.id}')">
+                    <i class="fas fa-check-double"></i> Получил актив
                 </button>
             ` : ''}
-            <button class="btn btn-secondary btn-small" onclick="showOrderDetailsModal(${order.id})">
+            <button class="btn btn-secondary btn-small" onclick="showOrderDetailsModal('${order.id}')">
                 <i class="fas fa-info-circle"></i> Подробнее
             </button>
         </div>
@@ -1082,7 +1146,7 @@ function copyOrderLink(orderCode) {
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(link).then(() => {
-            showToast(t('success'), t('linkCopied'), 'success');
+            showToast('Успех', 'Ссылка скопирована', 'success');
         }).catch(() => {
             fallbackCopyText(link);
         });
@@ -1105,9 +1169,9 @@ function fallbackCopyText(text) {
     
     try {
         document.execCommand('copy');
-        showToast(t('success'), t('linkCopied'), 'success');
+        showToast('Успех', 'Ссылка скопирована', 'success');
     } catch (err) {
-        showToast(t('error'), 'Не удалось скопировать', 'error');
+        showToast('Ошибка', 'Не удалось скопировать', 'error');
     }
     
     document.body.removeChild(textarea);
@@ -1130,7 +1194,7 @@ async function confirmPayment(orderId) {
             })
         });
         
-        showToast(t('success'), t('paymentConfirmed'), 'success');
+        showToast('Успех', 'Оплата подтверждена', 'success');
         await loadUserOrders();
     } catch (error) {
         console.error('Ошибка подтверждения оплаты:', error);
@@ -1150,7 +1214,7 @@ async function confirmTransfer(orderId) {
             })
         });
         
-        showToast(t('success'), t('buyerNotified'), 'success');
+        showToast('Успех', 'Покупатель уведомлен', 'success');
         await loadUserOrders();
         await initUser(); // Обновляем статистику
         showCompletionModal(orderId);
@@ -1172,35 +1236,13 @@ async function confirmReceipt(orderId) {
             })
         });
         
-        showToast(t('success'), t('dealCompleted'), 'success');
+        showToast('Успех', 'Сделка завершена', 'success');
         await loadUserOrders();
         await initUser(); // Обновляем статистику
         showCompletionModal(orderId);
     } catch (error) {
         console.error('Ошибка подтверждения получения:', error);
     }
-}
-
-/**
- * Показать модальное окно завершения сделки
- */
-function showCompletionModal(orderId) {
-    const order = state.orders.find(o => o.id === orderId);
-    if (!order) return;
-    
-    showModal(t('dealCompletedTitle'), `
-        <div class="modal-info-box">
-            <p><strong>${t('orderNumber')}</strong> ${order.code}</p>
-            <p><strong>${t('amount')}</strong> ${formatCurrency(order.amount, order.currency)}</p>
-            <p><strong>${t('type')}</strong> ${order.type}</p>
-        </div>
-        <p>${t('dealCompletedText')}</p>
-        <div class="modal-actions" style="margin-top: 20px;">
-            <button class="btn btn-success btn-full" onclick="closeModal()">
-                ${t('great')}
-            </button>
-        </div>
-    `);
 }
 
 // ============================================
@@ -1306,8 +1348,7 @@ function addDealToHistory(deal) {
 }
 
 // ============================================
-// Добавьте этот код в конец существующего script.js
-// после функции addDealToHistory()
+// Вспомогательные функции
 // ============================================
 
 /**
@@ -1371,7 +1412,6 @@ function showModal(title, content) {
     modalTitle.textContent = title;
     modalBody.innerHTML = content;
     modal.classList.remove('hidden');
-    modal.classList.add('active');
     
     // Блокируем скролл под модальным окном
     document.body.style.overflow = 'hidden';
@@ -1384,7 +1424,6 @@ function closeModal() {
     const modal = document.getElementById('modal');
     if (!modal) return;
     
-    modal.classList.remove('active');
     modal.classList.add('hidden');
     
     // Разблокируем скролл
@@ -1392,610 +1431,30 @@ function closeModal() {
 }
 
 /**
- * Проверка ордера из URL параметра
+ * Показать модальное окно завершения сделки
  */
-async function checkOrderFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderCode = urlParams.get('order');
+function showCompletionModal(orderId) {
+    const order = state.orders.find(o => o.id == orderId); // Исправлено: сравнение без строгого равенства
+    if (!order) return;
     
-    if (!orderCode) return;
-    
-    try {
-        const order = await apiRequest(API_CONFIG.endpoints.order(orderCode));
-        
-        if (order) {
-            showPage('orders');
-            
-            if (order.seller_telegram_id === state.user.telegram_id) {
-                // Это ордер продавца
-                showToast(t('info'), 'Это ваш ордер', 'info');
-            } else if (!order.buyer_telegram_id) {
-                // Покупатель может присоединиться
-                showModal(t('acceptOrder'), `
-                    <div class="modal-info-box">
-                        <p><strong>${t('type')}</strong> ${t(order.type)}</p>
-                        <p><strong>${t('amount')}</strong> ${formatCurrency(order.amount, order.currency)}</p>
-                        <p><strong>${t('description')}</strong> ${order.description}</p>
-                        <p><strong>${t('forPayment')}</strong></p>
-                        <p style="word-break: break-all;">${order.seller_requisites}</p>
-                    </div>
-                    <p>${t('paymentInstructions')}</p>
-                    <button class="btn btn-primary btn-full" onclick="joinOrder(${order.id})">
-                        ${t('acceptOrder')}
-                    </button>
-                `);
-            } else if (order.buyer_telegram_id === state.user.telegram_id) {
-                // Это покупатель уже присоединился
-                showToast(t('info'), 'Вы уже присоединились к этому ордеру', 'info');
-            } else {
-                showToast(t('warning'), 'У этого ордера уже есть покупатель', 'warning');
-            }
-        }
-    } catch (error) {
-        console.error('Ошибка загрузки ордера:', error);
-    }
-}
-
-/**
- * Присоединиться к ордеру (покупатель)
- */
-async function joinOrder(orderId) {
-    try {
-        const order = await apiRequest(API_CONFIG.endpoints.orderJoin(orderId), {
-            method: 'POST',
-            body: JSON.stringify({
-                buyer_telegram_id: state.user.telegram_id
-            })
-        });
-        
-        showToast(t('success'), t('connectedToOrder'), 'success');
-        closeModal();
-        await loadUserOrders();
-    } catch (error) {
-        console.error('Ошибка присоединения к ордеру:', error);
-        showToast(t('error'), error.message, 'error');
-    }
-}
-
-/**
- * Показать детали ордера в модальном окне
- */
-async function showOrderDetailsModal(orderId) {
-    try {
-        const order = state.orders.find(o => o.id === orderId);
-        if (!order) return;
-        
-        const isSeller = order.seller_telegram_id === state.user.telegram_id;
-        const isBuyer = order.buyer_telegram_id === state.user.telegram_id;
-        
-        let typeText = '';
-        switch(order.type) {
-            case 'nft_gift': typeText = t('nftGift'); break;
-            case 'nft_username': typeText = t('nftUsername'); break;
-            case 'nft_number': typeText = t('nftNumber'); break;
-            default: typeText = order.type;
-        }
-        
-        let paymentText = '';
-        switch(order.payment_method) {
-            case 'ton': paymentText = t('tonWallet'); break;
-            case 'card': paymentText = t('bankCard'); break;
-            case 'stars': paymentText = t('telegramStars'); break;
-            default: paymentText = order.payment_method;
-        }
-        
-        const modalContent = `
-            <div class="modal-info-box">
-                <p><strong>${t('code')}</strong> ${order.code}</p>
-                <p><strong>${t('type')}</strong> ${typeText}</p>
-                <p><strong>${t('payment')}</strong> ${paymentText}</p>
-                <p><strong>${t('amount')}</strong> ${formatCurrency(order.amount, order.currency)}</p>
-                <p><strong>${t('description')}</strong> ${order.description}</p>
-                <p><strong>Статус:</strong> ${order.status}</p>
-                <p><strong>Создан:</strong> ${new Date(order.created_at).toLocaleString()}</p>
-                <p><strong>Продавец:</strong> ${order.seller_username}</p>
-                ${order.buyer_username ? `<p><strong>Покупатель:</strong> ${order.buyer_username}</p>` : ''}
-            </div>
-            
-            ${isSeller && order.status === 'paid' ? `
-                <div class="modal-info-box">
-                    <h4>${t('confirmTransferTitle')}</h4>
-                    <p>${t('confirmTransferText')}</p>
-                    <p><strong>${t('deal')}</strong> #${order.code}</p>
-                    <p class="form-hint">${t('confirmTransferNote')}</p>
-                    <div class="modal-actions" style="margin-top: 15px; display: flex; gap: 10px;">
-                        <button class="btn btn-secondary" onclick="closeModal()">
-                            ${t('cancel')}
-                        </button>
-                        <button class="btn btn-success" onclick="confirmTransfer(${order.id}); closeModal();">
-                            ${t('confirm')}
-                        </button>
-                    </div>
-                </div>
-            ` : ''}
-            
-            ${isBuyer && order.status === 'active' ? `
-                <div class="modal-info-box">
-                    <h4>${t('forPayment')}</h4>
-                    <p style="word-break: break-all; font-family: monospace; background: #f5f5f5; padding: 10px; border-radius: 6px;">
-                        ${order.seller_requisites}
-                    </p>
-                    <p class="form-hint">${t('paymentInstructions')}</p>
-                    <button class="btn btn-primary btn-full" onclick="confirmPayment(${order.id}); closeModal();">
-                        ${t('iPaid')}
-                    </button>
-                </div>
-            ` : ''}
-        `;
-        
-        showModal(`Ордер #${order.code}`, modalContent);
-    } catch (error) {
-        console.error('Ошибка загрузки деталей ордера:', error);
-    }
-}
-
-/**
- * Админ: подтвердить оплату
- */
-async function adminConfirmPayment(orderId) {
-    try {
-        const order = await apiRequest(API_CONFIG.endpoints.fakePayment(orderId), {
-            method: 'POST',
-            body: JSON.stringify({
-                worker_telegram_id: state.user.telegram_id
-            })
-        });
-        
-        showToast(t('success'), 'Оплата подтверждена администратором', 'success');
-        await loadUserOrders();
-    } catch (error) {
-        console.error('Ошибка подтверждения оплаты админом:', error);
-        showToast(t('error'), error.message, 'error');
-    }
-}
-
-/**
- * Настройка админ-триггера (для открытия админ-панели)
- */
-function setupAdminTrigger() {
-    // Секретное сочетание для открытия админ-панели
-    let clickCount = 0;
-    const profileHeader = document.querySelector('#page-profile .page-header');
-    
-    if (profileHeader) {
-        profileHeader.addEventListener('click', () => {
-            clickCount++;
-            
-            if (clickCount >= 5) {
-                if (state.user.role === 'admin') {
-                    document.getElementById('adminPanel')?.classList.remove('hidden');
-                    showToast('👑 Админ', 'Панель администратора открыта', 'success');
-                } else if (state.user.role === 'worker') {
-                    document.getElementById('workerPanel')?.classList.remove('hidden');
-                    showToast('🛠️ Воркер', 'Панель воркера открыта', 'success');
-                } else {
-                    showToast('Информация', 'Вы не являетесь администратором или воркером', 'info');
-                }
-                clickCount = 0;
-            }
-        });
-    }
-}
-
-/**
- * Обновить количество сделок (админ)
- */
-async function updateDealsCount() {
-    const input = document.getElementById('adminDealsInput');
-    const count = parseInt(input.value) || 0;
-    
-    if (count >= 0) {
-        state.user.stats.completedDeals = count;
-        updateProfileStats();
-        showToast(t('success'), t('dealsCountUpdated'), 'success');
-    }
-}
-
-/**
- * Добавить оборот (админ)
- */
-async function addVolume() {
-    const input = document.getElementById('adminVolumeInput');
-    const value = input.value.trim();
-    
-    if (!value) return;
-    
-    const match = value.match(/([A-Z]{3}):(\d+(?:\.\d+)?)/i);
-    if (!match) {
-        showToast(t('error'), 'Используйте формат: USD:100', 'error');
-        return;
-    }
-    
-    const currency = match[1].toUpperCase();
-    const amount = parseFloat(match[2]);
-    
-    if (!state.user.stats.volumes) {
-        state.user.stats.volumes = {};
-    }
-    
-    state.user.stats.volumes[currency] = (state.user.stats.volumes[currency] || 0) + amount;
-    updateProfileStats();
-    showToast(t('success'), t('volumeAdded'), 'success');
-    input.value = '';
-}
-
-/**
- * Загрузить админ-данные
- */
-async function loadAdminData() {
-    if (state.user.role !== 'admin') return;
-    
-    try {
-        // Загрузка пользователей
-        const users = await apiRequest(API_CONFIG.endpoints.adminUsers + `?admin_telegram_id=${state.user.telegram_id}`);
-        updateAdminUsersList(users);
-        
-        // Загрузка воркеров
-        const workers = await apiRequest(API_CONFIG.endpoints.adminWorkers + `?admin_telegram_id=${state.user.telegram_id}`);
-        updateAdminWorkersList(workers);
-        
-        // Загрузка статистики платформы
-        const stats = await apiRequest(API_CONFIG.endpoints.adminStats + `?admin_telegram_id=${state.user.telegram_id}`);
-        updatePlatformStats(stats);
-        
-    } catch (error) {
-        console.error('Ошибка загрузки админ-данных:', error);
-    }
-}
-
-/**
- * Обновить список пользователей в админ-панели
- */
-function updateAdminUsersList(users) {
-    const usersList = document.getElementById('adminUsersList');
-    if (!usersList) return;
-    
-    usersList.innerHTML = '';
-    
-    users.slice(0, 20).forEach(user => {
-        const userCard = document.createElement('div');
-        userCard.className = 'admin-user-card';
-        userCard.style.borderLeftColor = user.role === 'admin' ? '#6c5ce7' : 
-                                       user.role === 'worker' ? '#fab1a0' : '#667eea';
-        
-        let totalVolumeUSD = 0;
-        if (user.total_volume) {
-            Object.entries(user.total_volume).forEach(([currency, amount]) => {
-                totalVolumeUSD += convertToUSD(amount, currency);
-            });
-        }
-        
-        userCard.innerHTML = `
-            <div style="font-weight: 600; margin-bottom: 5px;">
-                ${user.username} 
-                <span style="float: right; font-size: 0.8em; background: #eee; padding: 2px 6px; border-radius: 10px;">
-                    ${user.role}
-                </span>
-            </div>
-            <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
-                ID: ${user.telegram_id}
-            </div>
-            <div style="font-size: 0.85em;">
-                Сделок: ${user.completed_deals || 0} | Объём: $${totalVolumeUSD.toFixed(2)}
-            </div>
-        `;
-        
-        usersList.appendChild(userCard);
-    });
-}
-
-/**
- * Обновить список воркеров в админ-панели
- */
-function updateAdminWorkersList(workers) {
-    const workersList = document.getElementById('adminWorkersList');
-    if (!workersList) return;
-    
-    workersList.innerHTML = '';
-    
-    if (workers.length === 0) {
-        workersList.innerHTML = '<p class="empty-text">Нет воркеров</p>';
-        return;
-    }
-    
-    workers.forEach(worker => {
-        const workerCard = document.createElement('div');
-        workerCard.className = 'admin-worker-card';
-        workerCard.style.borderLeftColor = '#fab1a0';
-        
-        let totalVolumeUSD = 0;
-        if (worker.total_volume) {
-            Object.entries(worker.total_volume).forEach(([currency, amount]) => {
-                totalVolumeUSD += convertToUSD(amount, currency);
-            });
-        }
-        
-        workerCard.innerHTML = `
-            <div style="font-weight: 600; margin-bottom: 5px;">
-                ${worker.username}
-            </div>
-            <div style="font-size: 0.85em; color: #666; margin-bottom: 5px;">
-                ID: ${worker.telegram_id}
-            </div>
-            <div style="font-size: 0.85em; margin-bottom: 10px;">
-                Сделок: ${worker.completed_deals || 0} | Объём: $${totalVolumeUSD.toFixed(2)}
-            </div>
-            <button class="btn btn-danger btn-small" onclick="removeWorker('${worker.telegram_id}')">
-                <i class="fas fa-trash"></i> Удалить
-            </button>
-        `;
-        
-        workersList.appendChild(workerCard);
-    });
-}
-
-/**
- * Обновить статистику платформы
- */
-function updatePlatformStats(stats) {
-    document.getElementById('totalUsers').textContent = stats.totalUsers;
-    document.getElementById('totalOrders').textContent = stats.totalOrders;
-    document.getElementById('platformVolume').textContent = `$${parseFloat(stats.totalVolume).toFixed(2)}`;
-}
-
-/**
- * Добавить нового воркера
- */
-async function addNewWorker() {
-    const telegramId = document.getElementById('newWorkerTelegramId').value.trim();
-    const username = document.getElementById('newWorkerUsername').value.trim();
-    
-    if (!telegramId) {
-        showToast('Ошибка', 'Введите Telegram ID', 'error');
-        return;
-    }
-    
-    try {
-        await apiRequest(API_CONFIG.endpoints.addWorker, {
-            method: 'POST',
-            body: JSON.stringify({
-                admin_telegram_id: state.user.telegram_id,
-                worker_telegram_id: telegramId,
-                worker_username: username || 'Новый воркер'
-            })
-        });
-        
-        showToast('Успех', 'Воркер добавлен', 'success');
-        document.getElementById('newWorkerTelegramId').value = '';
-        document.getElementById('newWorkerUsername').value = '';
-        await loadAdminData();
-    } catch (error) {
-        console.error('Ошибка добавления воркера:', error);
-        showToast('Ошибка', error.message, 'error');
-    }
-}
-
-/**
- * Удалить воркера
- */
-async function removeWorker(telegramId) {
-    if (!confirm('Удалить этого воркера?')) return;
-    
-    try {
-        await apiRequest(API_CONFIG.endpoints.removeWorker, {
-            method: 'POST',
-            body: JSON.stringify({
-                admin_telegram_id: state.user.telegram_id,
-                worker_telegram_id: telegramId
-            })
-        });
-        
-        showToast('Успех', 'Воркер удален', 'success');
-        await loadAdminData();
-    } catch (error) {
-        console.error('Ошибка удаления воркера:', error);
-        showToast('Ошибка', error.message, 'error');
-    }
-}
-
-/**
- * Показать активные ордера для воркера
- */
-async function showActiveOrdersForWorker() {
-    const activeOrders = state.orders.filter(o => o.status === 'active');
-    
-    if (activeOrders.length === 0) {
-        showToast('Информация', 'Нет активных ордеров', 'info');
-        return;
-    }
-    
-    let ordersHtml = '';
-    activeOrders.forEach(order => {
-        const isParticipant = order.seller_telegram_id === state.user.telegram_id || 
-                             order.buyer_telegram_id === state.user.telegram_id;
-        
-        if (!isParticipant) {
-            ordersHtml += `
-                <div class="modal-info-box">
-                    <p><strong>#${order.code}</strong> ${formatCurrency(order.amount, order.currency)}</p>
-                    <p>${order.description}</p>
-                    <p>Продавец: ${order.seller_username}</p>
-                    ${order.buyer_username ? `<p>Покупатель: ${order.buyer_username}</p>` : '<p>Ожидает покупателя</p>'}
-                    <div class="modal-actions" style="margin-top: 10px; display: flex; gap: 10px;">
-                        <button class="btn btn-primary btn-small" onclick="adminConfirmPayment(${order.id}); closeModal();">
-                            Подтвердить оплату
-                        </button>
-                        <button class="btn btn-success btn-small" onclick="fastCompleteOrder(${order.id}); closeModal();">
-                            Быстро завершить
-                        </button>
-                    </div>
-                </div>
-            `;
-        }
-    });
-    
-    if (!ordersHtml) {
-        ordersHtml = '<p class="empty-text">Нет доступных ордеров для управления</p>';
-    }
-    
-    showModal('Активные ордера для воркера', ordersHtml);
-}
-
-/**
- * Быстро завершить сделку (воркер)
- */
-async function fastCompleteOrder(orderId) {
-    try {
-        await apiRequest(API_CONFIG.endpoints.fastComplete(orderId), {
-            method: 'POST',
-            body: JSON.stringify({
-                worker_telegram_id: state.user.telegram_id
-            })
-        });
-        
-        showToast('Успех', 'Сделка быстро завершена', 'success');
-        await loadUserOrders();
-        await initUser();
-    } catch (error) {
-        console.error('Ошибка быстрого завершения:', error);
-        showToast('Ошибка', error.message, 'error');
-    }
-}
-
-/**
- * Показать быстрое завершение (воркер)
- */
-function showQuickCompletion() {
-    showModal('Быстрое завершение сделки', `
+    showModal('Сделка завершена', `
         <div class="modal-info-box">
-            <p>Введите код ордера для быстрого завершения:</p>
-            <input type="text" id="quickCompleteCode" class="form-input" placeholder="Код ордера" style="margin: 10px 0;">
-            <button class="btn btn-success btn-full" onclick="quickCompleteByCode()">
-                Быстро завершить
+            <p><strong>Номер ордера:</strong> ${order.code}</p>
+            <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
+            <p><strong>Тип:</strong> ${order.type}</p>
+        </div>
+        <p>Сделка успешно завершена. Средства будут переведены продавцу.</p>
+        <div class="modal-actions" style="margin-top: 20px;">
+            <button class="btn btn-success btn-full" onclick="closeModal()">
+                Отлично
             </button>
         </div>
-        <p class="form-hint">Это действие мгновенно завершит сделку без подтверждения оплаты и передачи актива.</p>
     `);
 }
 
-/**
- * Быстро завершить по коду
- */
-async function quickCompleteByCode() {
-    const codeInput = document.getElementById('quickCompleteCode');
-    const code = codeInput.value.trim().toUpperCase();
-    
-    if (!code) {
-        showToast('Ошибка', 'Введите код ордера', 'error');
-        return;
-    }
-    
-    try {
-        const order = await apiRequest(API_CONFIG.endpoints.order(code));
-        
-        if (!order) {
-            showToast('Ошибка', 'Ордер не найден', 'error');
-            return;
-        }
-        
-        await apiRequest(API_CONFIG.endpoints.fastComplete(order.id), {
-            method: 'POST',
-            body: JSON.stringify({
-                worker_telegram_id: state.user.telegram_id
-            })
-        });
-        
-        showToast('Успех', `Сделка #${code} быстро завершена`, 'success');
-        closeModal();
-        await loadUserOrders();
-        await initUser();
-    } catch (error) {
-        console.error('Ошибка быстрого завершения:', error);
-        showToast('Ошибка', error.message, 'error');
-    }
-}
+// ============================================
+// Инициализация
+// ============================================
 
-/**
- * Запуск опроса уведомлений
- */
-function startNotificationPolling() {
-    state.intervals.notifications = setInterval(async () => {
-        if (state.user.telegram_id) {
-            await checkNotifications();
-        }
-    }, 30000); // Каждые 30 секунд
-}
-
-/**
- * Проверить уведомления
- */
-async function checkNotifications() {
-    try {
-        const notifications = await apiRequest(
-            API_CONFIG.endpoints.notifications(state.user.telegram_id)
-        );
-        
-        // Проверяем непрочитанные уведомления
-        const unread = notifications.filter(n => !n.read);
-        
-        unread.forEach(notification => {
-            showToast('Новое уведомление', notification.message, 'info');
-            
-            // Помечаем как прочитанное
-            apiRequest(`/api/notifications/${notification.id}/read`, {
-                method: 'PUT'
-            }).catch(console.error);
-        });
-        
-        // Обновляем счетчик уведомлений, если он есть
-        updateNotificationBadge(notifications.length);
-        
-    } catch (error) {
-        console.error('Ошибка проверки уведомлений:', error);
-    }
-}
-
-/**
- * Обновить бейдж уведомлений
- */
-function updateNotificationBadge(count) {
-    const navItem = document.querySelector('.bottom-nav-item[data-page="profile"]');
-    if (!navItem) return;
-    
-    let badge = navItem.querySelector('.notification-badge');
-    
-    if (count > 0) {
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'notification-badge';
-            navItem.appendChild(badge);
-        }
-        badge.textContent = count > 99 ? '99+' : count;
-    } else if (badge) {
-        badge.remove();
-    }
-}
-
-/**
- * Переключение языка
- */
-function switchLanguage(lang) {
-    if (currentLanguage === lang) return;
-    
-    currentLanguage = lang;
-    localStorage.setItem('language', lang);
-    
-    // Обновляем активные кнопки
-    document.querySelectorAll('.lang-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (btn.getAttribute('data-lang') === lang) {
-            btn.classList.add('active');
-        }
-    });
-    
-    document.documentElement.lang = lang;
-    updatePageTranslations();
-}
-
-// Инициализация при загрузке страницы
+// Запуск приложения при загрузке DOM
 document.addEventListener('DOMContentLoaded', initApp);
