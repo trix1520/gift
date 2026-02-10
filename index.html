@@ -2,21 +2,26 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta http-equiv="Content-Security-Policy" content="
-        default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;
-        script-src * 'unsafe-inline' 'unsafe-eval' data: blob:;
-        style-src * 'unsafe-inline' 'unsafe-eval';
-        img-src * data: blob:;
-        font-src * data:;
-        connect-src *;
-        frame-src *;
-        media-src *;
+        default-src 'self' https: 'unsafe-inline' 'unsafe-eval' data: blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
+        style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
+        img-src 'self' data: blob: https:;
+        font-src 'self' data: https://cdnjs.cloudflare.com;
+        connect-src 'self' ws: wss:;
+        frame-src 'self';
+        media-src 'self';
     ">
     <title>GiftMarket - P2P Escrow Platform</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎁</text></svg>">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <meta name="description" content="Надежный P2P гарант для безопасных сделок с NFT подарками, username и number аккаунтами Telegram">
 </head>
 <body>
     <div class="app-container">
@@ -29,7 +34,7 @@
                 </div>
                 <div class="header-info">
                     <div class="ton-price" id="tonPriceDisplay">
-                        <span data-i18n="tonPrice">TON:</span> $5.50
+                        <span data-i18n="tonPrice">TON:</span> $<span id="tonPriceValue">6.42</span>
                     </div>
                     <div class="language-switcher">
                         <button class="lang-btn active" data-lang="ru" onclick="switchLanguage('ru')">RU</button>
@@ -102,6 +107,7 @@
             <div id="page-requisites" class="page">
                 <div class="page-header">
                     <h1 data-i18n="requisites">Реквизиты</h1>
+                    <p class="page-subtitle">Укажите свои реквизиты для получения платежей</p>
                 </div>
 
                 <!-- TON Wallet -->
@@ -227,6 +233,7 @@
             <div id="page-orders" class="page">
                 <div class="page-header">
                     <h1 data-i18n="myOrders">Мои ордера</h1>
+                    <p class="page-subtitle">Управляйте своими сделками</p>
                 </div>
 
                 <!-- No Orders State -->
@@ -330,9 +337,13 @@
                         
                         <div class="form-group">
                             <label data-i18n="dealAmount">Сумма сделки</label>
-                            <input type="number" id="orderAmount" 
-                                   placeholder="1000" 
-                                   class="form-input">
+                            <div class="amount-input-container">
+                                <input type="number" id="orderAmount" 
+                                       placeholder="1000" 
+                                       class="form-input amount-input"
+                                       min="1">
+                                <div class="currency-display" id="currencyDisplay">RUB</div>
+                            </div>
                             <p class="form-hint">Введите сумму в выбранной валюте</p>
                         </div>
                         
@@ -342,6 +353,11 @@
                                       rows="3" 
                                       placeholder="Опишите предмет сделки..." 
                                       class="form-input"></textarea>
+                        </div>
+                        
+                        <div class="commission-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>Комиссия платформы: 1%</span>
                         </div>
                         
                         <button id="createOrderSubmit" class="btn btn-primary btn-large btn-full">
@@ -356,6 +372,20 @@
             <div id="page-profile" class="page">
                 <div class="page-header">
                     <h1 data-i18n="profile">Профиль</h1>
+                    <p class="page-subtitle" id="userTelegramId">ID: загрузка...</p>
+                </div>
+
+                <!-- User Info -->
+                <div class="user-info-card">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <h3 id="userName">Загрузка...</h3>
+                        <div class="user-role">
+                            <span class="role-badge user">Пользователь</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Stats -->
@@ -409,15 +439,18 @@
                         <p class="form-hint">Формат: Валюта:Сумма (например: USD:100)</p>
                     </div>
                     
-                    <!-- Новая секция для управления пользователями -->
                     <div class="admin-section">
                         <h4><i class="fas fa-users"></i> Все пользователи</h4>
-                        <div id="adminUsersList" class="admin-list"></div>
+                        <div id="adminUsersList" class="admin-list">
+                            <div class="loading-users">Загрузка...</div>
+                        </div>
                     </div>
                     
                     <div class="admin-section">
                         <h4><i class="fas fa-user-shield"></i> Воркеры</h4>
-                        <div id="adminWorkersList" class="admin-list"></div>
+                        <div id="adminWorkersList" class="admin-list">
+                            <div class="loading-workers">Загрузка...</div>
+                        </div>
                         
                         <div class="add-worker-form">
                             <h5>Добавить нового воркера</h5>
@@ -451,12 +484,26 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Worker Panel (hidden by default) -->
+                <div id="workerPanel" class="admin-panel hidden">
+                    <h3>🛠️ Панель воркера</h3>
+                    <div class="worker-actions">
+                        <button class="btn btn-primary btn-full" onclick="showActiveOrdersForWorker()">
+                            <i class="fas fa-list"></i> Показать активные ордера
+                        </button>
+                        <button class="btn btn-success btn-full" onclick="showQuickCompletion()">
+                            <i class="fas fa-bolt"></i> Быстрое завершение
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <!-- Support Page -->
             <div id="page-support" class="page">
                 <div class="page-header">
                     <h1 data-i18n="support">Поддержка</h1>
+                    <p class="page-subtitle">Мы всегда готовы помочь</p>
                 </div>
 
                 <div class="support-grid">
@@ -465,7 +512,7 @@
                             <i class="fas fa-clock"></i>
                         </div>
                         <h3 data-i18n="workingHours">Часы работы</h3>
-                        <div class="support-content">
+                        <div class="support-content" data-i18n="workingHoursText">
                             Ежедневно<br>с 6:00 до 22:00 UTC+3
                         </div>
                     </div>
@@ -506,6 +553,11 @@
                         <li>После подтверждения получения, покупатель завершает сделку</li>
                         <li>Деньги переводятся продавцу, актив - покупателю</li>
                     </ol>
+                    
+                    <div class="commission-info">
+                        <i class="fas fa-percentage"></i>
+                        <span>Комиссия платформы составляет всего 1% от суммы сделки</span>
+                    </div>
                 </div>
             </div>
         </main>
@@ -551,6 +603,14 @@
 
         <!-- Toast Container -->
         <div id="toastContainer" class="toast-container"></div>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="loading-overlay hidden">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <p>Загрузка...</p>
+            </div>
+        </div>
     </div>
 
     <script src="translations.js"></script>

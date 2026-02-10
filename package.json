@@ -1,11 +1,13 @@
 {
   "name": "giftmarket",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "GiftMarket P2P Escrow Platform",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "build": "echo 'Build complete'",
+    "test": "echo 'No tests yet'"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -15,6 +17,19 @@
     "nodemon": "^3.0.1"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "p2p",
+    "escrow",
+    "crypto",
+    "telegram",
+    "nft"
+  ],
+  "author": "GiftMarket Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/giftmarket/p2p-escrow.git"
   }
 }
