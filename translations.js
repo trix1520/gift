@@ -32,6 +32,9 @@ const translations = {
         
         // Реквизиты
         requisites: "Реквизиты",
+        userName: "Имя пользователя",
+        notSet: "Не указано",
+        enterUserName: "Укажите имя для отображения в профиле",
         tonWalletTitle: "TON кошелёк",
         bankCardTitle: "Банковская карта",
         telegramTitle: "Telegram",
@@ -121,6 +124,9 @@ const translations = {
         
         // Requisites
         requisites: "Requisites",
+        userName: "Username",
+        notSet: "Not set",
+        enterUserName: "Enter your name to display in profile",
         tonWalletTitle: "TON Wallet",
         bankCardTitle: "Bank Card",
         telegramTitle: "Telegram",
@@ -187,7 +193,6 @@ function switchLanguage(lang) {
     localStorage.setItem('language', lang);
     updateTranslations(lang);
     
-    // Обновляем активные кнопки языков
     document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.getAttribute('data-lang') === lang) {
@@ -201,7 +206,6 @@ function switchLanguage(lang) {
 function updateTranslations(lang) {
     const langData = translations[lang] || translations.ru;
     
-    // Обновляем все элементы с data-i18n
     document.querySelectorAll('[data-i18n]').forEach(element => {
         const key = element.getAttribute('data-i18n');
         if (langData[key]) {
@@ -216,8 +220,9 @@ function updateTranslations(lang) {
     });
 }
 
-// Инициализация языка при загрузке
 document.addEventListener('DOMContentLoaded', function() {
     const savedLang = localStorage.getItem('language') || 'ru';
     switchLanguage(savedLang);
 });
+
+window.switchLanguage = switchLanguage;

@@ -31,7 +31,8 @@ const API_CONFIG = {
         addWorker: '/admin/workers/add',
         removeWorker: '/admin/workers/remove',
         promoteAdmin: '/admin/promote',
-        adminStats: '/admin/stats'
+        adminStats: '/admin/stats',
+        updateUsername: (id) => `/users/${id}/username`
     }
 };
 
@@ -39,7 +40,7 @@ const API_CONFIG = {
 const state = {
     user: {
         id: null,
-        username: 'Пользователь',
+        username: null,
         telegram_id: null,
         role: 'user',
         isAdmin: false,
@@ -61,6 +62,8 @@ const state = {
     currentOrderData: {},
     currentStep: 1,
     tonPrice: 6.42,
+    adminClickCount: 0,
+    adminClickTimer: null,
     
     exchangeRates: {
         'RUB': 0.011,
@@ -74,12 +77,8 @@ const state = {
     
     intervals: {
         tonPrice: null,
-        deals: null,
-        notifications: null
-    },
-    
-    adminClickCount: 0,
-    adminClickTimer: null
+        deals: null
+    }
 };
 
 // ============================================
@@ -124,8 +123,8 @@ function hideLoader() {
     if (overlay) overlay.classList.add('hidden');
 }
 
-function generateRandomId() {
-    return `user_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+function generateNumericId() {
+    return Math.floor(100000000 + Math.random() * 900000000).toString();
 }
 
 // ============================================
@@ -183,11 +182,6 @@ async function apiRequest(endpoint, options = {}) {
 async function initApp() {
     console.log('🚀 GiftMarket инициализация...');
     
-    // Проверяем онлайн статус
-    if (!navigator.onLine) {
-        showToast('Внимание', 'Вы работаете в офлайн режиме', 'warning');
-    }
-    
     // Настройка слушателей событий
     setupEventListeners();
     
@@ -209,7 +203,31 @@ async function initApp() {
     await updateTonPrice();
     await checkOrderFromUrl();
     
+    // Исправление скролла
+    fixScrolling();
+    
     console.log('✅ Инициализация завершена');
+}
+
+function fixScrolling() {
+    // Принудительно включаем скролл
+    const appContainer = document.querySelector('.app-container');
+    const mainContent = document.querySelector('.main-content');
+    
+    if (appContainer) {
+        appContainer.style.overflowY = 'auto';
+        appContainer.style.webkitOverflowScrolling = 'touch';
+        appContainer.style.height = '100vh';
+    }
+    
+    if (mainContent) {
+        mainContent.style.overflowY = 'auto';
+        mainContent.style.webkitOverflowScrolling = 'touch';
+        mainContent.style.height = 'calc(100vh - 120px)';
+    }
+    
+    // Слушаем изменение страниц
+    document.addEventListener('pageChanged', fixScrolling);
 }
 
 function setupEventListeners() {
@@ -254,7 +272,7 @@ async function initUser() {
         const isNewUser = !telegramId;
         
         if (!telegramId) {
-            telegramId = generateRandomId();
+            telegramId = generateNumericId();
             localStorage.setItem('telegram_id', telegramId);
             localStorage.setItem('user_created', new Date().toISOString());
         }
@@ -262,16 +280,16 @@ async function initUser() {
         const userData = await apiRequest(API_CONFIG.endpoints.users, {
             method: 'POST',
             body: JSON.stringify({
-                username: `User_${telegramId.substr(-8)}`,
+                username: telegramId, // По умолчанию ID как имя
                 telegram_id: telegramId
             })
         });
         
         // Обновляем состояние пользователя
-        Object.assign(state.user, {
+        state.user = {
             id: userData.id,
             telegram_id: userData.telegram_id,
-            username: userData.username,
+            username: userData.username || userData.telegram_id,
             role: userData.role || 'user',
             isAdmin: userData.isAdmin || false,
             isWorker: userData.isWorker || false,
@@ -286,18 +304,15 @@ async function initUser() {
                 completedDeals: userData.completed_deals || 0,
                 volumes: userData.volumes || {}
             }
-        });
+        };
         
         updateUserInterface();
         await loadUserOrders();
         
-        // Показываем приветствие для новых пользователей
         if (isNewUser) {
-            showToast('🎉 Добро пожаловать!', 'Создайте свою первую сделку', 'info');
-            localStorage.setItem('welcome_shown', 'true');
+            showToast('🎉 Добро пожаловать!', `Ваш ID: ${telegramId}`, 'info');
         }
         
-        // Уведомление о роли
         if (state.user.role === 'admin') {
             showToast('👑 Администратор', 'Доступна панель администратора', 'success');
             setTimeout(() => loadAdminData(), 1000);
@@ -309,8 +324,8 @@ async function initUser() {
         console.error('Ошибка инициализации пользователя:', error);
         
         // Используем локальные данные при ошибке
-        state.user.telegram_id = localStorage.getItem('telegram_id') || generateRandomId();
-        state.user.username = `User_${state.user.telegram_id.substr(-8)}`;
+        state.user.telegram_id = localStorage.getItem('telegram_id') || generateNumericId();
+        state.user.username = state.user.telegram_id;
         updateUserInterface();
     }
 }
@@ -334,12 +349,12 @@ function updateUserInterface() {
     // Обновляем информацию о пользователе
     const userTelegramIdElement = document.getElementById('userTelegramId');
     if (userTelegramIdElement) {
-        userTelegramIdElement.textContent = `ID: ${state.user.telegram_id.substring(0, 16)}...`;
+        userTelegramIdElement.textContent = `ID: ${state.user.telegram_id}`;
     }
     
     const userNameElement = document.getElementById('userName');
     if (userNameElement) {
-        userNameElement.textContent = state.user.username;
+        userNameElement.textContent = state.user.username || state.user.telegram_id;
     }
     
     // Обновляем роль пользователя
@@ -383,7 +398,6 @@ function setupProfileClicks() {
     
     if (profileNavItem) {
         profileNavItem.addEventListener('click', function(e) {
-            // Не блокируем обычный переход
             const page = this.getAttribute('data-page');
             showPage(page);
             
@@ -399,7 +413,6 @@ function setupProfileClicks() {
         profileHeader.addEventListener('click', function() {
             state.adminClickCount++;
             
-            // Сбрасываем счетчик через 3 секунды
             if (state.adminClickTimer) {
                 clearTimeout(state.adminClickTimer);
             }
@@ -408,7 +421,6 @@ function setupProfileClicks() {
                 state.adminClickCount = 0;
             }, 3000);
             
-            // Если нажали 5 раз - открываем админ-панель
             if (state.adminClickCount === 5) {
                 state.adminClickCount = 0;
                 clearTimeout(state.adminClickTimer);
@@ -419,7 +431,6 @@ function setupProfileClicks() {
 }
 
 function showSecretAdminPanel() {
-    // Показываем модальное окно с запросом пароля
     showModal('🔐 Секретный вход', `
         <div class="modal-info-box">
             <p>Введите пароль администратора:</p>
@@ -431,41 +442,37 @@ function showSecretAdminPanel() {
         </div>
     `);
     
-    document.querySelector('.verify-admin-btn')?.addEventListener('click', function() {
-        const password = document.getElementById('adminSecretPassword')?.value;
-        
-        // Простая проверка пароля (в продакшене должно быть по-другому)
-        if (password === 'admin123') {
-            closeModal();
-            promoteToAdmin();
-        } else {
-            showToast('Ошибка', 'Неверный пароль', 'error');
-        }
-    });
+    setTimeout(() => {
+        document.querySelector('.verify-admin-btn')?.addEventListener('click', function() {
+            const password = document.getElementById('adminSecretPassword')?.value;
+            
+            if (password === 'admin123') {
+                closeModal();
+                promoteToAdmin();
+            } else {
+                showToast('Ошибка', 'Неверный пароль', 'error');
+            }
+        });
+    }, 100);
 }
 
 async function promoteToAdmin() {
     try {
-        // Повышаем пользователя до админа
         const result = await apiRequest(API_CONFIG.endpoints.promoteAdmin, {
             method: 'POST',
             body: JSON.stringify({
-                admin_telegram_id: 'admin_giftmarket', // Системный админ
+                admin_telegram_id: 'admin_giftmarket',
                 user_telegram_id: state.user.telegram_id
             })
         });
         
         if (result.success) {
-            // Обновляем роль пользователя
             state.user.role = 'admin';
             state.user.isAdmin = true;
             
-            // Обновляем интерфейс
             updateUserInterface();
-            
             showToast('👑 Поздравляем!', 'Вы стали администратором', 'success');
             
-            // Загружаем админ-данные
             setTimeout(() => loadAdminData(), 500);
         }
     } catch (error) {
@@ -479,6 +486,10 @@ async function promoteToAdmin() {
 // ============================================
 
 function setupRequisites() {
+    // Имя пользователя
+    document.querySelector('.save-user-name-btn')?.addEventListener('click', saveUserName);
+    document.querySelector('.edit-user-name-btn')?.addEventListener('click', editUserName);
+    
     // TON кошелек
     document.querySelector('.save-ton-wallet-btn')?.addEventListener('click', saveTonWallet);
     document.querySelector('.edit-ton-wallet-btn')?.addEventListener('click', editTonWallet);
@@ -493,6 +504,25 @@ function setupRequisites() {
 }
 
 function updateRequisitesUI() {
+    // Имя пользователя
+    const userName = state.user.username;
+    const userNameStatus = document.getElementById('userNameStatus');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+    const userNameForm = document.getElementById('userNameForm');
+    
+    if (userNameStatus && userNameDisplay && userNameForm) {
+        if (userName && userName !== state.user.telegram_id) {
+            userNameStatus.textContent = 'Указано';
+            userNameStatus.className = 'status active';
+            document.getElementById('userNameDisplayValue').textContent = userName;
+            userNameDisplay.classList.remove('hidden');
+            userNameForm.classList.add('hidden');
+        } else {
+            userNameDisplay.classList.add('hidden');
+            userNameForm.classList.remove('hidden');
+        }
+    }
+    
     // TON кошелек
     const tonWallet = state.user.requisites.tonWallet;
     const tonStatus = document.getElementById('tonStatus');
@@ -549,6 +579,45 @@ function updateRequisitesUI() {
             telegramDisplay.classList.add('hidden');
             telegramForm.classList.remove('hidden');
         }
+    }
+}
+
+async function saveUserName() {
+    const userNameInput = document.getElementById('userNameInput');
+    const userName = userNameInput?.value.trim();
+    
+    if (!userName) {
+        showToast('Ошибка', 'Введите имя пользователя', 'error');
+        return;
+    }
+    
+    try {
+        const user = await apiRequest(API_CONFIG.endpoints.updateUsername(state.user.telegram_id), {
+            method: 'PUT',
+            body: JSON.stringify({ username: userName })
+        });
+        
+        state.user.username = user.username;
+        updateUserInterface();
+        showToast('Успех', 'Имя пользователя сохранено', 'success');
+    } catch (error) {
+        console.error('Ошибка сохранения имени:', error);
+        showToast('Ошибка', 'Не удалось сохранить имя', 'error');
+    }
+}
+
+function editUserName() {
+    const userNameInput = document.getElementById('userNameInput');
+    if (userNameInput) {
+        userNameInput.value = state.user.username || '';
+    }
+    
+    const userNameDisplay = document.getElementById('userNameDisplay');
+    const userNameForm = document.getElementById('userNameForm');
+    
+    if (userNameDisplay && userNameForm) {
+        userNameDisplay.classList.add('hidden');
+        userNameForm.classList.remove('hidden');
     }
 }
 
@@ -614,11 +683,9 @@ async function saveCard() {
             })
         });
         
-        Object.assign(state.user.requisites, {
-            card: user.card_number,
-            cardBank: user.card_bank,
-            cardCurrency: user.card_currency
-        });
+        state.user.requisites.card = user.card_number;
+        state.user.requisites.cardBank = user.card_bank;
+        state.user.requisites.cardCurrency = user.card_currency;
         
         updateUserInterface();
         showToast('Успех', 'Банковская карта сохранена', 'success');
@@ -686,13 +753,11 @@ function editTelegram() {
 }
 
 function updateProfileStats() {
-    // Завершенные сделки
     const completedDealsElement = document.getElementById('completedDeals');
     if (completedDealsElement) {
         completedDealsElement.textContent = state.user.stats.completedDeals;
     }
     
-    // Общий оборот
     const totalVolumeElement = document.getElementById('totalVolume');
     if (totalVolumeElement) {
         let totalUSD = 0;
@@ -704,7 +769,6 @@ function updateProfileStats() {
         totalVolumeElement.textContent = `$${formatNumber(totalUSD)}`;
     }
     
-    // Оборот по валютам
     const currencyStatsElement = document.getElementById('currencyStats');
     if (currencyStatsElement) {
         if (state.user.stats.volumes && Object.keys(state.user.stats.volumes).length > 0) {
@@ -743,19 +807,16 @@ function setupBottomNavigation() {
 }
 
 function showPage(pageName) {
-    // Скрываем все страницы
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
     });
     
-    // Показываем целевую страницу
     const targetPage = document.getElementById('page-' + pageName);
     if (targetPage) {
         targetPage.classList.add('active');
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     
-    // Обновляем активный пункт навигации
     document.querySelectorAll('.bottom-nav-item').forEach(nav => {
         nav.classList.remove('active');
         if (nav.getAttribute('data-page') === pageName) {
@@ -763,7 +824,9 @@ function showPage(pageName) {
         }
     });
     
-    // Выполняем действия при переключении страниц
+    // Триггерим событие смены страницы для исправления скролла
+    document.dispatchEvent(new Event('pageChanged'));
+    
     switch (pageName) {
         case 'orders':
             updateOrdersList();
@@ -781,7 +844,6 @@ function showPage(pageName) {
 // ============================================
 
 function setupOrderCreation() {
-    // Кнопки создания ордера
     const createOrderBtn = document.getElementById('createOrderBtn');
     const createOrderBtn2 = document.getElementById('createOrderBtn2');
     const cancelOrderBtn = document.querySelector('.cancel-order-btn');
@@ -798,7 +860,6 @@ function setupOrderCreation() {
         cancelOrderBtn.addEventListener('click', cancelOrderCreation);
     }
     
-    // Кнопки навигации по шагам
     document.querySelectorAll('.prev-step-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const step = parseInt(this.getAttribute('data-step'));
@@ -806,7 +867,6 @@ function setupOrderCreation() {
         });
     });
     
-    // Выбор типа сделки
     document.querySelectorAll('[data-type]').forEach(item => {
         item.addEventListener('click', function() {
             document.querySelectorAll('[data-type]').forEach(i => i.classList.remove('selected'));
@@ -816,7 +876,6 @@ function setupOrderCreation() {
         });
     });
     
-    // Выбор способа оплаты
     document.querySelectorAll('[data-payment]').forEach(item => {
         item.addEventListener('click', function() {
             document.querySelectorAll('[data-payment]').forEach(i => i.classList.remove('selected'));
@@ -827,7 +886,6 @@ function setupOrderCreation() {
         });
     });
     
-    // Создание ордера
     const createOrderSubmit = document.getElementById('createOrderSubmit');
     if (createOrderSubmit) {
         createOrderSubmit.addEventListener('click', createOrder);
@@ -932,7 +990,6 @@ async function createOrder() {
     const amount = orderAmountInput?.value.trim();
     const description = orderDescriptionInput?.value.trim();
     
-    // Валидация
     if (!state.currentOrderData.type || !state.currentOrderData.payment_method || !amount || !description) {
         showToast('Ошибка', 'Заполните все поля', 'error');
         return;
@@ -944,7 +1001,6 @@ async function createOrder() {
         return;
     }
     
-    // Проверка реквизитов
     if (state.currentOrderData.payment_method === 'ton' && !state.user.requisites.tonWallet) {
         showToast('Ошибка', 'Добавьте TON кошелёк в реквизитах', 'error');
         showPage('requisites');
@@ -963,7 +1019,6 @@ async function createOrder() {
         return;
     }
     
-    // Определение валюты
     let currency = 'RUB';
     if (state.currentOrderData.payment_method === 'ton') {
         currency = 'TON';
@@ -984,33 +1039,39 @@ async function createOrder() {
             })
         });
         
-        // Показываем модальное окно с информацией
-        showModal('Ордер создан', `
+        showModal('✅ Ордер создан', `
             <div class="modal-info-box">
-                <p><strong>Код:</strong> ${order.code}</p>
-                <p><strong>Тип:</strong> ${state.currentOrderData.type}</p>
+                <p><strong>Код ордера:</strong> #${order.code}</p>
+                <p><strong>Тип:</strong> ${getTypeText(order.type)}</p>
                 <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
                 <p><strong>Описание:</strong> ${order.description}</p>
             </div>
-            <div class="modal-info-box">
-                <p><strong>Ссылка для покупателя:</strong></p>
-                <div class="order-link" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 8px; word-break: break-all;">
+            <div class="modal-info-box" style="margin-top: 15px;">
+                <p><strong>🔗 Ссылка для покупателя:</strong></p>
+                <div style="background: #f5f5f5; padding: 12px; border-radius: 8px; word-break: break-all; margin: 10px 0;">
                     ${window.location.origin}?order=${order.code}
                 </div>
-                <button class="btn btn-primary btn-full copy-order-link-btn" data-code="${order.code}">
-                    <i class="fas fa-copy"></i> Скопировать ссылку
-                </button>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn btn-primary btn-half copy-order-link-btn" data-code="${order.code}">
+                        <i class="fas fa-copy"></i> Копировать ссылку
+                    </button>
+                    <button class="btn btn-success btn-half open-payment-link-btn" data-code="${order.code}">
+                        <i class="fas fa-external-link-alt"></i> Перейти к оплате
+                    </button>
+                </div>
             </div>
         `);
         
-        // Добавляем обработчик для кнопки копирования
         document.querySelector('.copy-order-link-btn')?.addEventListener('click', function() {
-            const code = this.getAttribute('data-code');
-            copyOrderLink(code);
-            closeModal();
+            copyOrderLink(this.getAttribute('data-code'));
         });
         
-        // Обновляем список ордеров
+        document.querySelector('.open-payment-link-btn')?.addEventListener('click', function() {
+            const code = this.getAttribute('data-code');
+            const url = `${window.location.origin}?order=${code}`;
+            window.open(url, '_blank');
+        });
+        
         await loadUserOrders();
         cancelOrderCreation();
         
@@ -1037,7 +1098,6 @@ function updateOrdersList() {
         ordersListContainer.classList.add('hidden');
         ordersList.classList.remove('hidden');
         
-        // Сортируем ордера по дате создания (новые сверху)
         const sortedOrders = [...state.orders].sort((a, b) => 
             new Date(b.created_at) - new Date(a.created_at)
         );
@@ -1053,7 +1113,6 @@ function createOrderCard(order) {
     const card = document.createElement('div');
     card.className = 'order-card';
     
-    // Определение статуса
     let statusClass = 'status-active';
     let statusText = 'Активен';
     
@@ -1072,39 +1131,6 @@ function createOrderCard(order) {
             break;
     }
     
-    // Перевод типа сделки
-    let typeText = '';
-    switch(order.type) {
-        case 'nft_gift':
-            typeText = 'Продажа NFT подарка';
-            break;
-        case 'nft_username':
-            typeText = 'Продажа NFT username';
-            break;
-        case 'nft_number':
-            typeText = 'Продажа NFT number';
-            break;
-        default:
-            typeText = order.type;
-    }
-    
-    // Перевод способа оплаты
-    let paymentText = '';
-    switch(order.payment_method) {
-        case 'ton':
-            paymentText = 'TON кошелёк';
-            break;
-        case 'card':
-            paymentText = 'Банковская карта';
-            break;
-        case 'stars':
-            paymentText = 'Telegram Stars';
-            break;
-        default:
-            paymentText = order.payment_method;
-    }
-    
-    // Определение ролей пользователя
     const isSeller = order.seller_telegram_id === state.user.telegram_id;
     const isBuyer = order.buyer_telegram_id === state.user.telegram_id;
     
@@ -1117,11 +1143,11 @@ function createOrderCard(order) {
         <div class="order-details">
             <div class="order-detail">
                 <span class="detail-label">Тип</span>
-                <span class="detail-value">${typeText}</span>
+                <span class="detail-value">${getTypeText(order.type)}</span>
             </div>
             <div class="order-detail">
                 <span class="detail-label">Оплата</span>
-                <span class="detail-value">${paymentText}</span>
+                <span class="detail-value">${getPaymentText(order.payment_method)}</span>
             </div>
             <div class="order-detail">
                 <span class="detail-label">Сумма</span>
@@ -1147,21 +1173,23 @@ function createOrderCard(order) {
         
         <div class="order-actions">
             ${order.status === 'active' ? `
-                <button class="btn btn-secondary btn-small copy-link-btn" data-code="${order.code}">
-                    <i class="fas fa-copy"></i> Копировать ссылку
-                </button>
+                ${!isSeller ? `
+                    <button class="btn btn-primary btn-small pay-order-btn" data-code="${order.code}">
+                        <i class="fas fa-credit-card"></i> Оплатить
+                    </button>
+                ` : ''}
                 ${isBuyer ? `
-                    <button class="btn btn-primary btn-small confirm-payment-btn" data-id="${order.id}">
+                    <button class="btn btn-success btn-small confirm-payment-btn" data-id="${order.id}">
                         <i class="fas fa-check"></i> Я оплатил
                     </button>
                 ` : ''}
                 ${isSeller && order.buyer_telegram_id ? `
-                    <button class="btn btn-success btn-small confirm-transfer-btn" data-id="${order.id}">
+                    <button class="btn btn-warning btn-small confirm-transfer-btn" data-id="${order.id}">
                         <i class="fas fa-exchange-alt"></i> Актив передан
                     </button>
                 ` : ''}
                 ${(state.user.role === 'admin' || state.user.role === 'worker') && !isBuyer && !isSeller ? `
-                    <button class="btn btn-warning btn-small fake-payment-btn" data-id="${order.id}">
+                    <button class="btn btn-danger btn-small fake-payment-btn" data-id="${order.id}">
                         <i class="fas fa-user-shield"></i> Фейк оплата
                     </button>
                 ` : ''}
@@ -1177,9 +1205,9 @@ function createOrderCard(order) {
         </div>
     `;
     
-    // Добавляем обработчики событий
-    card.querySelector('.copy-link-btn')?.addEventListener('click', function() {
-        copyOrderLink(this.getAttribute('data-code'));
+    card.querySelector('.pay-order-btn')?.addEventListener('click', function() {
+        const code = this.getAttribute('data-code');
+        window.open(`${window.location.origin}?order=${code}`, '_blank');
     });
     
     card.querySelector('.confirm-payment-btn')?.addEventListener('click', function() {
@@ -1203,6 +1231,24 @@ function createOrderCard(order) {
     });
     
     return card;
+}
+
+function getTypeText(type) {
+    const types = {
+        'nft_gift': 'Продажа NFT подарка',
+        'nft_username': 'Продажа NFT username',
+        'nft_number': 'Продажа NFT number'
+    };
+    return types[type] || type;
+}
+
+function getPaymentText(payment) {
+    const payments = {
+        'ton': 'TON кошелёк',
+        'card': 'Банковская карта',
+        'stars': 'Telegram Stars'
+    };
+    return payments[payment] || payment;
 }
 
 // ============================================
@@ -1271,7 +1317,7 @@ async function confirmTransfer(orderId) {
         
         showToast('Успех', 'Покупатель уведомлен', 'success');
         await loadUserOrders();
-        await initUser(); // Обновляем статистику
+        await initUser();
         showCompletionModal(orderId);
     } catch (error) {
         console.error('Ошибка подтверждения передачи:', error);
@@ -1290,7 +1336,7 @@ async function confirmReceipt(orderId) {
         
         showToast('Успех', 'Сделка завершена', 'success');
         await loadUserOrders();
-        await initUser(); // Обновляем статистику
+        await initUser();
         showCompletionModal(orderId);
     } catch (error) {
         console.error('Ошибка подтверждения получения:', error);
@@ -1319,7 +1365,7 @@ function showFakePaymentModal(orderId) {
             <button class="btn btn-secondary btn-half close-modal-btn">
                 Отмена
             </button>
-            <button class="btn btn-warning btn-half confirm-fake-payment-btn" data-id="${order.id}">
+            <button class="btn btn-danger btn-half confirm-fake-payment-btn" data-id="${order.id}">
                 <i class="fas fa-check"></i> Подтвердить фейк оплату
             </button>
         </div>
@@ -1357,37 +1403,42 @@ function showOrderDetailsModal(orderId) {
     
     let actionsHtml = '';
     if (order.status === 'active') {
+        if (!isSeller) {
+            actionsHtml += `
+                <button class="btn btn-primary btn-full pay-order-modal-btn" data-code="${order.code}">
+                    <i class="fas fa-credit-card"></i> Перейти к оплате
+                </button>
+            `;
+        }
         if (isBuyer) {
-            actionsHtml = `
-                <button class="btn btn-primary btn-full confirm-payment-modal-btn" data-id="${order.id}">
+            actionsHtml += `
+                <button class="btn btn-success btn-full confirm-payment-modal-btn" data-id="${order.id}" style="margin-top: 10px;">
                     <i class="fas fa-check"></i> Подтвердить оплату
                 </button>
             `;
         } else if (isSeller && order.buyer_telegram_id) {
-            actionsHtml = `
-                <button class="btn btn-success btn-full confirm-transfer-modal-btn" data-id="${order.id}">
+            actionsHtml += `
+                <button class="btn btn-warning btn-full confirm-transfer-modal-btn" data-id="${order.id}" style="margin-top: 10px;">
                     <i class="fas fa-exchange-alt"></i> Подтвердить передачу актива
                 </button>
             `;
         }
     } else if (order.status === 'paid' && isBuyer) {
-        actionsHtml = `
+        actionsHtml += `
             <button class="btn btn-success btn-full confirm-receipt-modal-btn" data-id="${order.id}">
                 <i class="fas fa-check-double"></i> Подтвердить получение актива
             </button>
         `;
     }
     
-    // Добавляем кнопку фейк оплаты для воркеров
     if ((state.user.role === 'admin' || state.user.role === 'worker') && !isBuyer && !isSeller && order.status === 'active') {
         actionsHtml += `
-            <button class="btn btn-warning btn-full fake-payment-modal-btn" data-id="${order.id}" style="margin-top: 10px;">
+            <button class="btn btn-danger btn-full fake-payment-modal-btn" data-id="${order.id}" style="margin-top: 10px;">
                 <i class="fas fa-user-shield"></i> Подтвердить фейк оплату
             </button>
         `;
     }
     
-    // Информация о фейк оплате
     let fakePaymentInfo = '';
     if (order.fake_payment) {
         fakePaymentInfo = `
@@ -1399,27 +1450,38 @@ function showOrderDetailsModal(orderId) {
         `;
     }
     
+    let buyerInfo = '';
+    if (order.buyer_telegram_id) {
+        buyerInfo = `<p><strong>Покупатель:</strong> ${order.buyer_username || order.buyer_telegram_id}</p>`;
+    }
+    
     showModal('Детали ордера', `
         <div class="modal-info-box">
             <p><strong>Код ордера:</strong> #${order.code}</p>
             <p><strong>Статус:</strong> ${order.status === 'active' ? 'Активен' : order.status === 'paid' ? 'Оплачен' : 'Завершен'}</p>
-            <p><strong>Тип сделки:</strong> ${order.type}</p>
-            <p><strong>Способ оплаты:</strong> ${order.payment_method}</p>
+            <p><strong>Тип сделки:</strong> ${getTypeText(order.type)}</p>
+            <p><strong>Способ оплаты:</strong> ${getPaymentText(order.payment_method)}</p>
             <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
             <p><strong>Описание:</strong> ${order.description}</p>
+            <p><strong>Продавец:</strong> ${order.seller_username}</p>
+            ${buyerInfo}
             <p><strong>Создан:</strong> ${new Date(order.created_at).toLocaleString('ru-RU')}</p>
-            ${order.buyer_telegram_id ? `<p><strong>Покупатель:</strong> ${order.buyer_username || order.buyer_telegram_id}</p>` : ''}
         </div>
         ${fakePaymentInfo}
         ${actionsHtml}
-        <div class="modal-actions" style="margin-top: 20px;">
+        <div style="margin-top: 20px;">
             <button class="btn btn-secondary btn-full copy-order-link-modal-btn" data-code="${order.code}">
                 <i class="fas fa-copy"></i> Копировать ссылку на ордер
             </button>
         </div>
     `);
     
-    // Добавляем обработчики
+    document.querySelector('.pay-order-modal-btn')?.addEventListener('click', function() {
+        const code = this.getAttribute('data-code');
+        window.open(`${window.location.origin}?order=${code}`, '_blank');
+        closeModal();
+    });
+    
     document.querySelector('.confirm-payment-modal-btn')?.addEventListener('click', function() {
         confirmPayment(this.getAttribute('data-id'));
         closeModal();
@@ -1451,12 +1513,10 @@ function showOrderDetailsModal(orderId) {
 // ============================================
 
 function setupAdminPanel() {
-    // Кнопки админ-панели
     document.querySelector('.update-deals-btn')?.addEventListener('click', updateDealsCount);
     document.querySelector('.add-volume-btn')?.addEventListener('click', addVolume);
     document.querySelector('.add-worker-btn')?.addEventListener('click', addNewWorker);
     
-    // Кнопки панели воркера
     document.querySelector('.show-active-orders-btn')?.addEventListener('click', showActiveOrdersForWorker);
     document.querySelector('.show-quick-completion-btn')?.addEventListener('click', showQuickCompletion);
 }
@@ -1465,15 +1525,12 @@ async function loadAdminData() {
     if (state.user.role !== 'admin') return;
     
     try {
-        // Загрузка всех пользователей
         const users = await apiRequest(`${API_CONFIG.endpoints.adminUsers}?admin_telegram_id=${state.user.telegram_id}`);
         updateAdminUsersList(users);
         
-        // Загрузка воркеров
         const workers = await apiRequest(`${API_CONFIG.endpoints.adminWorkers}?admin_telegram_id=${state.user.telegram_id}`);
         updateAdminWorkersList(workers);
         
-        // Загрузка статистики
         const stats = await apiRequest(`${API_CONFIG.endpoints.adminStats}?admin_telegram_id=${state.user.telegram_id}`);
         updatePlatformStats(stats);
         
@@ -1488,7 +1545,7 @@ function updateAdminUsersList(users) {
     
     usersList.innerHTML = '';
     
-    users.forEach(user => {
+    users.slice(0, 10).forEach(user => {
         const userCard = document.createElement('div');
         userCard.className = 'admin-user-card';
         userCard.style.borderLeftColor = user.role === 'admin' ? '#667eea' : user.role === 'worker' ? '#ed8936' : '#48bb78';
@@ -1502,7 +1559,7 @@ function updateAdminUsersList(users) {
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <strong>${user.username}</strong>
-                    <div style="font-size: 12px; color: #666;">ID: ${user.telegram_id.substring(0, 16)}...</div>
+                    <div style="font-size: 12px; color: #666;">ID: ${user.telegram_id}</div>
                     <div style="font-size: 12px; color: #666;">Роль: ${user.role}</div>
                 </div>
                 <div style="text-align: right;">
@@ -1536,7 +1593,7 @@ function updateAdminWorkersList(workers) {
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <strong>${worker.username}</strong>
-                    <div style="font-size: 12px; color: #666;">ID: ${worker.telegram_id.substring(0, 16)}...</div>
+                    <div style="font-size: 12px; color: #666;">ID: ${worker.telegram_id}</div>
                     <div style="font-size: 12px; color: #666;">Сделок: ${worker.completed_deals || 0}</div>
                 </div>
                 <div style="text-align: right;">
@@ -1548,7 +1605,6 @@ function updateAdminWorkersList(workers) {
             </div>
         `;
         
-        // Добавляем обработчик для кнопки удаления
         workerCard.querySelector('.remove-worker-btn')?.addEventListener('click', function() {
             removeWorker(this.getAttribute('data-id'));
         });
@@ -1614,11 +1670,17 @@ async function addNewWorker() {
     const telegramIdInput = document.getElementById('newWorkerTelegramId');
     const usernameInput = document.getElementById('newWorkerUsername');
     
-    const telegramId = telegramIdInput.value.trim();
+    let telegramId = telegramIdInput.value.trim();
     const username = usernameInput.value.trim();
     
     if (!telegramId || !username) {
         showToast('Ошибка', 'Заполните все поля', 'error');
+        return;
+    }
+    
+    // Проверяем, что ID состоит только из цифр
+    if (!/^\d+$/.test(telegramId)) {
+        showToast('Ошибка', 'Telegram ID должен состоять только из цифр', 'error');
         return;
     }
     
@@ -1636,7 +1698,6 @@ async function addNewWorker() {
         usernameInput.value = '';
         showToast('Успех', 'Воркер добавлен', 'success');
         
-        // Обновляем список воркеров
         await loadAdminData();
         
     } catch (error) {
@@ -1646,7 +1707,7 @@ async function addNewWorker() {
 }
 
 async function removeWorker(workerTelegramId) {
-    if (!confirm(`Удалить воркера ${workerTelegramId.substring(0, 16)}...?`)) return;
+    if (!confirm(`Удалить воркера ${workerTelegramId}?`)) return;
     
     try {
         await apiRequest(API_CONFIG.endpoints.removeWorker, {
@@ -1671,13 +1732,6 @@ async function removeWorker(workerTelegramId) {
 // ============================================
 
 function showActiveOrdersForWorker() {
-    showModal('Активные ордера', `
-        <div class="modal-info-box">
-            <p>Загрузка ордеров...</p>
-        </div>
-    `);
-    
-    // Загружаем активные ордера
     const activeOrders = state.orders.filter(order => 
         order.status === 'active' && 
         order.seller_telegram_id !== state.user.telegram_id &&
@@ -1685,7 +1739,6 @@ function showActiveOrdersForWorker() {
     );
     
     if (activeOrders.length === 0) {
-        closeModal();
         showToast('Информация', 'Нет доступных активных ордеров', 'info');
         return;
     }
@@ -1701,7 +1754,7 @@ function showActiveOrdersForWorker() {
                 <div class="order-details">
                     <div class="order-detail">
                         <span class="detail-label">Тип</span>
-                        <span class="detail-value">${order.type}</span>
+                        <span class="detail-value">${getTypeText(order.type)}</span>
                     </div>
                     <div class="order-detail">
                         <span class="detail-label">Сумма</span>
@@ -1713,7 +1766,7 @@ function showActiveOrdersForWorker() {
                     </div>
                 </div>
                 <div class="order-actions">
-                    <button class="btn btn-warning btn-small worker-fake-payment-btn" data-id="${order.id}">
+                    <button class="btn btn-danger btn-small worker-fake-payment-btn" data-id="${order.id}">
                         <i class="fas fa-user-shield"></i> Фейк оплата
                     </button>
                     <button class="btn btn-success btn-small worker-fast-complete-btn" data-id="${order.id}">
@@ -1725,10 +1778,8 @@ function showActiveOrdersForWorker() {
     });
     ordersHtml += '</div>';
     
-    closeModal();
     showModal('🛠️ Активные ордера для воркера', ordersHtml);
     
-    // Добавляем обработчики
     document.querySelectorAll('.worker-fake-payment-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             fakePayment(this.getAttribute('data-id'));
@@ -1790,17 +1841,14 @@ async function quickCompleteByCode() {
     }
     
     try {
-        // Сначала получаем ордер по коду
         const order = await apiRequest(API_CONFIG.endpoints.orderByCode(code));
         
-        // Проверяем, не является ли пользователь участником сделки
         if (order.seller_telegram_id === state.user.telegram_id || 
             order.buyer_telegram_id === state.user.telegram_id) {
             showToast('Ошибка', 'Нельзя завершить свою сделку', 'error');
             return;
         }
         
-        // Затем быстро завершаем
         await apiRequest(API_CONFIG.endpoints.fastComplete(order.id), {
             method: 'POST',
             body: JSON.stringify({
@@ -1928,38 +1976,109 @@ async function checkOrderFromUrl() {
             const order = await apiRequest(API_CONFIG.endpoints.orderByCode(orderCode));
             
             if (order.status === 'active' && !order.buyer_telegram_id) {
-                // Проверяем, что пользователь не продавец
                 if (order.seller_telegram_id === state.user.telegram_id) {
                     showToast('Информация', 'Это ваш ордер', 'info');
                     return;
                 }
                 
-                // Предлагаем присоединиться к ордеру
-                showModal('Присоединиться к сделке', `
+                showModal('💰 Присоединиться к сделке', `
                     <div class="modal-info-box">
                         <p><strong>Код ордера:</strong> #${order.code}</p>
-                        <p><strong>Тип:</strong> ${order.type}</p>
+                        <p><strong>Тип:</strong> ${getTypeText(order.type)}</p>
                         <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
                         <p><strong>Описание:</strong> ${order.description}</p>
                         <p><strong>Продавец:</strong> ${order.seller_username}</p>
                     </div>
-                    <button class="btn btn-primary btn-full join-order-btn" data-id="${order.id}">
-                        <i class="fas fa-handshake"></i> Присоединиться к сделке
-                    </button>
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button class="btn btn-primary btn-half join-order-btn" data-id="${order.id}">
+                            <i class="fas fa-handshake"></i> Присоединиться
+                        </button>
+                        <button class="btn btn-success btn-half open-payment-btn" data-code="${order.code}">
+                            <i class="fas fa-external-link-alt"></i> Перейти к оплате
+                        </button>
+                    </div>
                 `);
                 
                 document.querySelector('.join-order-btn')?.addEventListener('click', function() {
                     joinOrder(this.getAttribute('data-id'));
                     closeModal();
                 });
+                
+                document.querySelector('.open-payment-btn')?.addEventListener('click', function() {
+                    const code = this.getAttribute('data-code');
+                    window.open(`${window.location.origin}?order=${code}`, '_blank');
+                });
+                
             } else {
-                showToast('Информация', 'Этот ордер уже обрабатывается', 'info');
+                showModal('💳 Оплата ордера', `
+                    <div class="modal-info-box">
+                        <p><strong>Код ордера:</strong> #${order.code}</p>
+                        <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
+                        <p><strong>Продавец:</strong> ${order.seller_username}</p>
+                        <p><strong>Реквизиты продавца:</strong></p>
+                        <div style="background: #f5f5f5; padding: 10px; border-radius: 8px; margin-top: 5px;">
+                            ${getSellerRequisitesHTML(order)}
+                        </div>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <button class="btn btn-primary btn-full mark-paid-btn" data-id="${order.id}">
+                            <i class="fas fa-check"></i> Я оплатил
+                        </button>
+                        <p class="form-hint" style="margin-top: 10px;">
+                            Нажмите кнопку после оплаты
+                        </p>
+                    </div>
+                `);
+                
+                document.querySelector('.mark-paid-btn')?.addEventListener('click', function() {
+                    if (confirm('Вы подтверждаете, что оплатили этот ордер?')) {
+                        joinAndPay(this.getAttribute('data-id'));
+                    }
+                });
             }
             
         } catch (error) {
             console.error('Ошибка загрузки ордера:', error);
             showToast('Ошибка', 'Ордер не найден', 'error');
         }
+    }
+}
+
+function getSellerRequisitesHTML(order) {
+    switch(order.payment_method) {
+        case 'ton':
+            return `TON кошелёк: ${order.seller_requisites || 'Не указан'}`;
+        case 'card':
+            return `Карта: ${order.seller_requisites || 'Не указана'}`;
+        case 'stars':
+            return `Telegram: ${order.seller_requisites || 'Не указан'}`;
+        default:
+            return 'Реквизиты не указаны';
+    }
+}
+
+async function joinAndPay(orderId) {
+    try {
+        await apiRequest(API_CONFIG.endpoints.orderJoin(orderId), {
+            method: 'POST',
+            body: JSON.stringify({
+                buyer_telegram_id: state.user.telegram_id
+            })
+        });
+        
+        await confirmPayment(orderId);
+        
+        showToast('✅ Успех', 'Вы присоединились к сделке и подтвердили оплату', 'success');
+        closeModal();
+        
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        await loadUserOrders();
+        showPage('orders');
+        
+    } catch (error) {
+        console.error('Ошибка:', error);
+        showToast('Ошибка', error.message, 'error');
     }
 }
 
@@ -1975,13 +2094,9 @@ async function joinOrder(orderId) {
         showToast('✅ Успех', 'Вы присоединились к сделке', 'success');
         closeModal();
         
-        // Обновляем URL без параметра order
         window.history.replaceState({}, document.title, window.location.pathname);
         
-        // Обновляем список ордеров
         await loadUserOrders();
-        
-        // Переходим на страницу ордеров
         showPage('orders');
         
     } catch (error) {
@@ -2027,7 +2142,6 @@ function showModal(title, content) {
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
     
-    // Добавляем обработчик для закрытия модалки
     document.querySelector('.close-modal-btn')?.addEventListener('click', closeModal);
 }
 
@@ -2047,7 +2161,7 @@ function showCompletionModal(orderId) {
         <div class="modal-info-box">
             <p><strong>Номер ордера:</strong> ${order.code}</p>
             <p><strong>Сумма:</strong> ${formatCurrency(order.amount, order.currency)}</p>
-            <p><strong>Тип:</strong> ${order.type}</p>
+            <p><strong>Тип:</strong> ${getTypeText(order.type)}</p>
         </div>
         <p style="margin-top: 15px;">Сделка успешно завершена. Средства будут переведены продавцу.</p>
         <div class="modal-actions" style="margin-top: 20px;">
@@ -2062,5 +2176,5 @@ function showCompletionModal(orderId) {
 // Инициализация
 // ============================================
 
-// Запуск приложения при загрузке DOM
 document.addEventListener('DOMContentLoaded', initApp);
+window.addEventListener('load', fixScrolling);

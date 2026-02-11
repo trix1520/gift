@@ -13,7 +13,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Middleware для настройки CSP заголовков
 app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', 
         "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; " +
@@ -30,7 +29,6 @@ app.use((req, res, next) => {
 
 app.use(express.static(__dirname));
 
-// Имитация базы данных
 let users = [];
 let orders = [];
 let notifications = [];
@@ -38,14 +36,11 @@ let userCounter = 1000;
 let orderCounter = 5000;
 let notificationCounter = 10000;
 
-// Админ по умолчанию (только для демо)
 let admins = ['admin_giftmarket'];
 let workers = [];
 
-// Файл для хранения данных (простая JSON база)
 const DATA_FILE = 'database.json';
 
-// Загрузка данных из файла
 function loadData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
@@ -65,7 +60,6 @@ function loadData() {
     }
 }
 
-// Сохранение данных в файл
 function saveData() {
     try {
         const data = {
@@ -86,11 +80,9 @@ function saveData() {
     }
 }
 
-// Инициализация данных
 function initializeData() {
     loadData();
     
-    // Создаем админа по умолчанию если его нет
     if (!users.find(u => u.telegram_id === 'admin_giftmarket')) {
         const adminUser = {
             id: userCounter++,
@@ -113,12 +105,11 @@ function initializeData() {
         console.log('👑 Создан администратор по умолчанию');
     }
     
-    // Создаем тестового пользователя для демо
-    if (!users.find(u => u.telegram_id === 'test_user')) {
+    if (!users.find(u => u.telegram_id === '123456789')) {
         const testUser = {
             id: userCounter++,
-            username: 'Тестовый Пользователь',
-            telegram_id: 'test_user',
+            username: '123456789',
+            telegram_id: '123456789',
             isAdmin: false,
             isWorker: false,
             ton_wallet: null,
@@ -141,21 +132,15 @@ function initializeData() {
     console.log(`🛒 Ордеров: ${orders.length}`);
 }
 
-// API Routes
-
-// Получить курс TON
 app.get('/api/ton-price', (req, res) => {
-    // Реальный курс TON (может быть подключено к реальному API)
-    const tonPrice = 6.42 + (Math.random() * 0.5 - 0.25); // Небольшие колебания для реалистичности
+    const tonPrice = 6.42 + (Math.random() * 0.5 - 0.25);
     res.json({ price: tonPrice.toFixed(2) });
 });
 
-// Создать/получить пользователя
 app.post('/api/users', (req, res) => {
     const { username, telegram_id } = req.body;
     
-    // Генерация уникального ID для новых пользователей
-    const userTelegramId = telegram_id || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const userTelegramId = telegram_id || generateNumericId();
     
     let user = users.find(u => u.telegram_id === userTelegramId);
     
@@ -165,7 +150,7 @@ app.post('/api/users', (req, res) => {
         
         user = {
             id: userCounter++,
-            username: username || `Пользователь ${users.length + 1}`,
+            username: username || userTelegramId,
             telegram_id: userTelegramId,
             isAdmin: isAdmin,
             isWorker: isWorker,
@@ -192,7 +177,6 @@ app.post('/api/users', (req, res) => {
     res.json(user);
 });
 
-// Получить данные пользователя
 app.get('/api/users/:telegram_id', (req, res) => {
     const user = users.find(u => u.telegram_id === req.params.telegram_id);
     
@@ -203,7 +187,24 @@ app.get('/api/users/:telegram_id', (req, res) => {
     }
 });
 
-// Обновить реквизиты пользователя
+app.put('/api/users/:telegram_id/username', (req, res) => {
+    const user = users.find(u => u.telegram_id === req.params.telegram_id);
+    
+    if (!user) {
+        return res.status(404).json({ error: 'Пользователь не найден' });
+    }
+    
+    const { username } = req.body;
+    
+    if (username) {
+        user.username = username;
+        saveData();
+        res.json({ success: true, username: user.username });
+    } else {
+        res.status(400).json({ error: 'Имя пользователя не может быть пустым' });
+    }
+});
+
 app.put('/api/users/:telegram_id/requisites', (req, res) => {
     const user = users.find(u => u.telegram_id === req.params.telegram_id);
     
@@ -231,7 +232,6 @@ app.put('/api/users/:telegram_id/requisites', (req, res) => {
     res.json(user);
 });
 
-// Получить ордера пользователя
 app.get('/api/users/:telegram_id/orders', (req, res) => {
     const user = users.find(u => u.telegram_id === req.params.telegram_id);
     
@@ -247,7 +247,6 @@ app.get('/api/users/:telegram_id/orders', (req, res) => {
     res.json(userOrders);
 });
 
-// Создать ордер
 app.post('/api/orders', (req, res) => {
     const {
         seller_telegram_id,
@@ -263,7 +262,6 @@ app.post('/api/orders', (req, res) => {
         return res.status(404).json({ error: 'Продавец не найден' });
     }
     
-    // Проверка реквизитов в зависимости от метода оплаты
     if (payment_method === 'ton' && !seller.ton_wallet) {
         return res.status(400).json({ error: 'Добавьте TON кошелёк в реквизитах' });
     }
@@ -294,13 +292,18 @@ app.post('/api/orders', (req, res) => {
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        commission: parseFloat(amount) * 0.01, // 1% комиссия
-        commission_paid: false
+        commission: parseFloat(amount) * 0.01,
+        commission_paid: false,
+        fake_payment: false,
+        fake_payment_by: null,
+        fake_payment_at: null,
+        fast_complete: false,
+        fast_complete_by: null,
+        fast_complete_at: null
     };
     
     orders.push(order);
     
-    // Уведомление админу о новом ордере
     admins.forEach(adminId => {
         const admin = users.find(u => u.telegram_id === adminId);
         if (admin) {
@@ -322,7 +325,6 @@ app.post('/api/orders', (req, res) => {
     res.json(order);
 });
 
-// Получить ордер по коду
 app.get('/api/orders/:code', (req, res) => {
     const order = orders.find(o => o.code === req.params.code);
     
@@ -333,7 +335,6 @@ app.get('/api/orders/:code', (req, res) => {
     }
 });
 
-// Получить ордер по ID
 app.get('/api/orders/id/:id', (req, res) => {
     const orderId = parseInt(req.params.id);
     const order = orders.find(o => o.id === orderId);
@@ -345,7 +346,6 @@ app.get('/api/orders/id/:id', (req, res) => {
     }
 });
 
-// Присоединиться к ордеру (покупатель)
 app.post('/api/orders/:id/join', (req, res) => {
     const orderId = parseInt(req.params.id);
     const { buyer_telegram_id } = req.body;
@@ -362,6 +362,10 @@ app.post('/api/orders/:id/join', (req, res) => {
     
     if (order.status !== 'active') {
         return res.status(400).json({ error: 'Ордер неактивен' });
+    }
+    
+    if (order.buyer_telegram_id) {
+        return res.status(400).json({ error: 'К этому ордеру уже присоединились' });
     }
     
     const buyer = users.find(u => u.telegram_id === buyer_telegram_id);
@@ -387,7 +391,6 @@ app.post('/api/orders/:id/join', (req, res) => {
         `✅ Вы присоединились к ордеру #${order.code}. Сумма: ${order.amount} ${order.currency}`
     );
     
-    // Уведомление админу
     admins.forEach(adminId => {
         createNotification(
             adminId,
@@ -400,7 +403,6 @@ app.post('/api/orders/:id/join', (req, res) => {
     res.json(order);
 });
 
-// Обновить статус ордера
 app.put('/api/orders/:id/status', (req, res) => {
     const orderId = parseInt(req.params.id);
     const { status, user_telegram_id } = req.body;
@@ -417,7 +419,6 @@ app.put('/api/orders/:id/status', (req, res) => {
         return res.status(400).json({ error: 'Пользователь не найден' });
     }
     
-    // Проверка прав
     const isSeller = user.id === order.seller_id;
     const isBuyer = user.id === order.buyer_id;
     const isAdmin = user.isAdmin;
@@ -427,7 +428,6 @@ app.put('/api/orders/:id/status', (req, res) => {
         return res.status(403).json({ error: 'Доступ запрещен' });
     }
     
-    // Логика изменения статуса
     const oldStatus = order.status;
     
     if (status === 'paid') {
@@ -455,7 +455,6 @@ app.put('/api/orders/:id/status', (req, res) => {
             `💰 Оплата ордера #${order.code} подтверждена. Сумма: ${order.amount} ${order.currency}`
         );
         
-        // Уведомление админу о подтверждении оплаты
         admins.forEach(adminId => {
             createNotification(
                 adminId,
@@ -464,7 +463,6 @@ app.put('/api/orders/:id/status', (req, res) => {
             );
         });
     } else if (status === 'completed' && oldStatus === 'paid') {
-        // Обновляем статистику продавца
         const seller = users.find(u => u.telegram_id === order.seller_telegram_id);
         if (seller) {
             seller.completed_deals = (seller.completed_deals || 0) + 1;
@@ -472,7 +470,6 @@ app.put('/api/orders/:id/status', (req, res) => {
             seller.volumes[order.currency] = (seller.volumes[order.currency] || 0) + order.amount;
         }
         
-        // Обновляем статистику покупателя
         const buyer = users.find(u => u.telegram_id === order.buyer_telegram_id);
         if (buyer) {
             buyer.completed_deals = (buyer.completed_deals || 0) + 1;
@@ -490,10 +487,8 @@ app.put('/api/orders/:id/status', (req, res) => {
             `✅ Сделка #${order.code} успешно завершена!`
         );
         
-        // Комиссия платформе
         order.commission_paid = true;
         
-        // Уведомление админу о завершении сделки
         admins.forEach(adminId => {
             createNotification(
                 adminId,
@@ -507,7 +502,6 @@ app.put('/api/orders/:id/status', (req, res) => {
     res.json(order);
 });
 
-// API для воркеров - фейковая оплата
 app.post('/api/orders/:id/fake-payment', (req, res) => {
     const orderId = parseInt(req.params.id);
     const { worker_telegram_id } = req.body;
@@ -528,14 +522,12 @@ app.post('/api/orders/:id/fake-payment', (req, res) => {
         return res.status(400).json({ error: 'Ордер должен быть активным' });
     }
     
-    // Обновляем статус
     order.status = 'paid';
     order.updated_at = new Date().toISOString();
     order.fake_payment = true;
     order.fake_payment_by = worker.username;
     order.fake_payment_at = new Date().toISOString();
     
-    // Уведомления
     createNotification(
         order.seller_telegram_id,
         'fake_payment_confirmed',
@@ -550,7 +542,6 @@ app.post('/api/orders/:id/fake-payment', (req, res) => {
         );
     }
     
-    // Уведомление админу
     admins.forEach(adminId => {
         createNotification(
             adminId,
@@ -568,7 +559,6 @@ app.post('/api/orders/:id/fake-payment', (req, res) => {
     });
 });
 
-// API для воркеров - быстрое завершение сделки
 app.post('/api/orders/:id/fast-complete', (req, res) => {
     const orderId = parseInt(req.params.id);
     const { worker_telegram_id } = req.body;
@@ -589,7 +579,6 @@ app.post('/api/orders/:id/fast-complete', (req, res) => {
         return res.status(400).json({ error: 'Некорректный статус ордера' });
     }
     
-    // Обновляем статус
     const oldStatus = order.status;
     order.status = 'completed';
     order.updated_at = new Date().toISOString();
@@ -597,7 +586,6 @@ app.post('/api/orders/:id/fast-complete', (req, res) => {
     order.fast_complete_by = worker.username;
     order.fast_complete_at = new Date().toISOString();
     
-    // Обновляем статистику
     const seller = users.find(u => u.telegram_id === order.seller_telegram_id);
     if (seller) {
         seller.completed_deals = (seller.completed_deals || 0) + 1;
@@ -624,7 +612,6 @@ app.post('/api/orders/:id/fast-complete', (req, res) => {
         `⚡ Воркер ${worker.username} быстро завершил сделку #${order.code}`
     );
     
-    // Уведомление админу
     admins.forEach(adminId => {
         createNotification(
             adminId,
@@ -642,7 +629,6 @@ app.post('/api/orders/:id/fast-complete', (req, res) => {
     });
 });
 
-// API для админов - получить всех пользователей
 app.get('/api/admin/users', (req, res) => {
     const { admin_telegram_id } = req.query;
     
@@ -665,7 +651,6 @@ app.get('/api/admin/users', (req, res) => {
     res.json(userList);
 });
 
-// API для админов - получить всех воркеров
 app.get('/api/admin/workers', (req, res) => {
     const { admin_telegram_id } = req.query;
     
@@ -687,7 +672,6 @@ app.get('/api/admin/workers', (req, res) => {
     res.json(workerList);
 });
 
-// API для админов - добавить воркера
 app.post('/api/admin/workers/add', (req, res) => {
     const { admin_telegram_id, worker_telegram_id, worker_username } = req.body;
     
@@ -696,13 +680,17 @@ app.post('/api/admin/workers/add', (req, res) => {
         return res.status(403).json({ error: 'Только админы могут добавлять воркеров' });
     }
     
+    // Проверяем, что ID состоит только из цифр
+    if (!/^\d+$/.test(worker_telegram_id)) {
+        return res.status(400).json({ error: 'Telegram ID должен состоять только из цифр' });
+    }
+    
     if (workers.includes(worker_telegram_id)) {
         return res.status(400).json({ error: 'Этот пользователь уже является воркером' });
     }
     
     workers.push(worker_telegram_id);
     
-    // Обновляем или создаем пользователя
     let worker = users.find(u => u.telegram_id === worker_telegram_id);
     if (worker) {
         worker.isWorker = true;
@@ -713,7 +701,7 @@ app.post('/api/admin/workers/add', (req, res) => {
     } else {
         worker = {
             id: userCounter++,
-            username: worker_username || 'Новый воркер',
+            username: worker_username || worker_telegram_id,
             telegram_id: worker_telegram_id,
             isAdmin: false,
             isWorker: true,
@@ -748,7 +736,6 @@ app.post('/api/admin/workers/add', (req, res) => {
     });
 });
 
-// API для админов - удалить воркера
 app.post('/api/admin/workers/remove', (req, res) => {
     const { admin_telegram_id, worker_telegram_id } = req.body;
     
@@ -784,7 +771,6 @@ app.post('/api/admin/workers/remove', (req, res) => {
     });
 });
 
-// API для админов - сделать пользователя админом
 app.post('/api/admin/promote', (req, res) => {
     const { admin_telegram_id, user_telegram_id } = req.body;
     
@@ -821,7 +807,6 @@ app.post('/api/admin/promote', (req, res) => {
     });
 });
 
-// API для админов - получить статистику платформы
 app.get('/api/admin/stats', (req, res) => {
     const { admin_telegram_id } = req.query;
     
@@ -844,7 +829,6 @@ app.get('/api/admin/stats', (req, res) => {
     res.json(platformStats);
 });
 
-// Получить уведомления пользователя
 app.get('/api/users/:telegram_id/notifications', (req, res) => {
     const userNotifications = notifications
         .filter(n => n.user_telegram_id === req.params.telegram_id)
@@ -854,7 +838,6 @@ app.get('/api/users/:telegram_id/notifications', (req, res) => {
     res.json(userNotifications);
 });
 
-// Пометить уведомление как прочитанное
 app.put('/api/notifications/:id/read', (req, res) => {
     const notification = notifications.find(n => n.id === parseInt(req.params.id));
     
@@ -868,7 +851,6 @@ app.put('/api/notifications/:id/read', (req, res) => {
     }
 });
 
-// Удалить уведомление
 app.delete('/api/notifications/:id', (req, res) => {
     const index = notifications.findIndex(n => n.id === parseInt(req.params.id));
     
@@ -881,7 +863,6 @@ app.delete('/api/notifications/:id', (req, res) => {
     }
 });
 
-// Очистить все уведомления пользователя
 app.delete('/api/users/:telegram_id/notifications', (req, res) => {
     const userTelegramId = req.params.telegram_id;
     
@@ -891,7 +872,10 @@ app.delete('/api/users/:telegram_id/notifications', (req, res) => {
     res.json({ success: true, message: 'Все уведомления удалены' });
 });
 
-// Вспомогательные функции
+function generateNumericId() {
+    return Math.floor(100000000 + Math.random() * 900000000).toString();
+}
+
 function generateOrderCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -899,7 +883,6 @@ function generateOrderCode() {
         code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     
-    // Проверяем уникальность кода
     if (orders.find(o => o.code === code)) {
         return generateOrderCode();
     }
@@ -985,20 +968,17 @@ function getLast24HoursStats() {
     };
 }
 
-// Инициализация данных при старте сервера
 initializeData();
 
-// Все остальные маршруты ведут к index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Запуск сервера
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
     console.log(`📡 API доступен по адресу: http://localhost:${PORT}/api`);
     console.log(`👑 Админ доступ: telegram_id = admin_giftmarket`);
-    console.log(`👤 Тестовый пользователь: telegram_id = test_user`);
+    console.log(`👤 Тестовый пользователь: telegram_id = 123456789`);
     console.log(`💾 Данные сохраняются в файл: ${DATA_FILE}`);
 });
