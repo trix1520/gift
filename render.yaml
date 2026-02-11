@@ -1,14 +1,54 @@
 services:
+  # Backend сервис
   - type: web
-    name: giftmarket
+    name: giftmarket-backend
     env: node
-    plan: free
-    buildCommand: npm install
-    startCommand: node server.js
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
     envVars:
-      - key: NODE_VERSION
-        value: 18.17.0
       - key: NODE_ENV
         value: production
-    healthCheckPath: /api/ton-price
-    autoDeploy: true
+      - key: DB_HOST
+        fromDatabase:
+          name: giftmarket-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: giftmarket-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: giftmarket-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: giftmarket-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: giftmarket-db
+          property: password
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://giftmarket-frontend.onrender.com
+
+  # Frontend сервис
+  - type: web
+    name: giftmarket-frontend
+    env: static
+    buildCommand: echo "Static site, no build needed"
+    staticPublishPath: ./frontend
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://giftmarket-backend.onrender.com/api
+
+databases:
+  - name: giftmarket-db
+    databaseName: giftmarket
+    user: giftmarket_user
+    plan: free
