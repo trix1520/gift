@@ -333,6 +333,18 @@ app.get('/api/orders/:code', (req, res) => {
     }
 });
 
+// Получить ордер по ID
+app.get('/api/orders/id/:id', (req, res) => {
+    const orderId = parseInt(req.params.id);
+    const order = orders.find(o => o.id === orderId);
+    
+    if (order) {
+        res.json(order);
+    } else {
+        res.status(404).json({ error: 'Ордер не найден' });
+    }
+});
+
 // Присоединиться к ордеру (покупатель)
 app.post('/api/orders/:id/join', (req, res) => {
     const orderId = parseInt(req.params.id);

@@ -37,8 +37,8 @@
                         <span data-i18n="tonPrice">TON:</span> $<span id="tonPriceValue">6.42</span>
                     </div>
                     <div class="language-switcher">
-                        <button class="lang-btn active" data-lang="ru" onclick="switchLanguage('ru')">RU</button>
-                        <button class="lang-btn" data-lang="en" onclick="switchLanguage('en')">EN</button>
+                        <button class="lang-btn active" data-lang="ru">RU</button>
+                        <button class="lang-btn" data-lang="en">EN</button>
                     </div>
                 </div>
             </div>
@@ -125,7 +125,7 @@
                     <div id="tonWalletDisplay" class="hidden">
                         <div class="requisite-display">
                             <code id="tonWalletAddress"></code>
-                            <button class="btn btn-secondary btn-small" onclick="editTonWallet()">
+                            <button class="btn btn-secondary btn-small edit-ton-wallet-btn">
                                 <i class="fas fa-edit"></i>
                                 <span data-i18n="edit">Изменить</span>
                             </button>
@@ -137,7 +137,7 @@
                             <input type="text" id="tonWalletInput" 
                                    placeholder="UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" 
                                    class="form-input">
-                            <button class="btn btn-primary btn-small" onclick="saveTonWallet()">
+                            <button class="btn btn-primary btn-small save-ton-wallet-btn">
                                 <i class="fas fa-save"></i>
                                 <span data-i18n="save">Сохранить</span>
                             </button>
@@ -163,7 +163,7 @@
                     <div id="cardDisplay" class="hidden">
                         <div class="requisite-display">
                             <span id="cardInfo"></span>
-                            <button class="btn btn-secondary btn-small" onclick="editCard()">
+                            <button class="btn btn-secondary btn-small edit-card-btn">
                                 <i class="fas fa-edit"></i>
                                 <span data-i18n="edit">Изменить</span>
                             </button>
@@ -185,7 +185,7 @@
                                 <option value="KZT" data-i18n="KZT">KZT</option>
                                 <option value="UAH" data-i18n="UAH">UAH</option>
                             </select>
-                            <button class="btn btn-primary btn-small" onclick="saveCard()">
+                            <button class="btn btn-primary btn-small save-card-btn">
                                 <i class="fas fa-save"></i>
                                 <span data-i18n="save">Сохранить</span>
                             </button>
@@ -208,7 +208,7 @@
                     <div id="telegramDisplay" class="hidden">
                         <div class="requisite-display">
                             <span id="telegramUsername"></span>
-                            <button class="btn btn-secondary btn-small" onclick="editTelegram()">
+                            <button class="btn btn-secondary btn-small edit-telegram-btn">
                                 <i class="fas fa-edit"></i>
                                 <span data-i18n="edit">Изменить</span>
                             </button>
@@ -220,7 +220,7 @@
                             <input type="text" id="telegramInput" 
                                    placeholder="@username" 
                                    class="form-input">
-                            <button class="btn btn-primary btn-small" onclick="saveTelegram()">
+                            <button class="btn btn-primary btn-small save-telegram-btn">
                                 <i class="fas fa-save"></i>
                                 <span data-i18n="save">Сохранить</span>
                             </button>
@@ -260,7 +260,7 @@
                 <div id="createOrderForm" class="create-order-form hidden">
                     <div class="form-header">
                         <h2 data-i18n="orderCreation">Создание ордера</h2>
-                        <button class="btn btn-icon" onclick="cancelOrderCreation()">
+                        <button class="btn btn-icon cancel-order-btn">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -296,7 +296,7 @@
                     <!-- Step 2: Payment Method -->
                     <div id="step2" class="form-step hidden">
                         <div class="form-step-header">
-                            <button class="btn btn-icon" onclick="previousStep(1)">
+                            <button class="btn btn-icon prev-step-btn" data-step="1">
                                 <i class="fas fa-arrow-left"></i>
                             </button>
                             <h3 data-i18n="paymentMethod">Способ оплаты</h3>
@@ -329,7 +329,7 @@
                     <!-- Step 3: Order Details -->
                     <div id="step3" class="form-step hidden">
                         <div class="form-step-header">
-                            <button class="btn btn-icon" onclick="previousStep(2)">
+                            <button class="btn btn-icon prev-step-btn" data-step="2">
                                 <i class="fas fa-arrow-left"></i>
                             </button>
                             <h3 data-i18n="orderDetails">Детали ордера</h3>
@@ -426,7 +426,7 @@
                         <label data-i18n="dealsCount">Количество сделок</label>
                         <div class="input-with-button">
                             <input type="number" id="adminDealsInput" class="form-input" value="0">
-                            <button class="btn btn-secondary" onclick="updateDealsCount()" data-i18n="update">Обновить</button>
+                            <button class="btn btn-secondary update-deals-btn" data-i18n="update">Обновить</button>
                         </div>
                     </div>
                     
@@ -434,7 +434,7 @@
                         <label data-i18n="addVolume">Добавить оборот</label>
                         <div class="input-with-button">
                             <input type="text" id="adminVolumeInput" class="form-input" placeholder="USD:100">
-                            <button class="btn btn-secondary" onclick="addVolume()" data-i18n="add">Добавить</button>
+                            <button class="btn btn-secondary add-volume-btn" data-i18n="add">Добавить</button>
                         </div>
                         <p class="form-hint">Формат: Валюта:Сумма (например: USD:100)</p>
                     </div>
@@ -458,7 +458,7 @@
                                 <input type="text" id="newWorkerTelegramId" placeholder="Telegram ID" class="form-input">
                                 <input type="text" id="newWorkerUsername" placeholder="Имя" class="form-input">
                             </div>
-                            <button class="btn btn-success btn-full" onclick="addNewWorker()">
+                            <button class="btn btn-success btn-full add-worker-btn">
                                 <i class="fas fa-plus"></i> Добавить воркера
                             </button>
                         </div>
@@ -489,10 +489,10 @@
                 <div id="workerPanel" class="admin-panel hidden">
                     <h3>🛠️ Панель воркера</h3>
                     <div class="worker-actions">
-                        <button class="btn btn-primary btn-full" onclick="showActiveOrdersForWorker()">
+                        <button class="btn btn-primary btn-full show-active-orders-btn">
                             <i class="fas fa-list"></i> Показать активные ордера
                         </button>
-                        <button class="btn btn-success btn-full" onclick="showQuickCompletion()">
+                        <button class="btn btn-success btn-full show-quick-completion-btn">
                             <i class="fas fa-bolt"></i> Быстрое завершение
                         </button>
                     </div>
@@ -593,7 +593,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="modalTitle"></h3>
-                    <button class="btn btn-icon" onclick="closeModal()">
+                    <button class="btn btn-icon close-modal-btn">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>

@@ -180,6 +180,8 @@ const translations = {
     }
 };
 
+let currentLanguage = 'ru';
+
 function switchLanguage(lang) {
     currentLanguage = lang;
     localStorage.setItem('language', lang);

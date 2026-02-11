@@ -1,10 +1,7 @@
-// ============================================
+// ============================================
 // GiftMarket P2P Escrow Platform
 // Основной JavaScript файл - ИСПРАВЛЕННАЯ ВЕРСИЯ
 // ============================================
-
-// УДАЛИТЕ ЭТУ СТРОКУ: let currentLanguage = 'ru'; 
-// currentLanguage уже объявлен в translations.js
 
 // Конфигурация API
 const API_CONFIG = {
@@ -180,8 +177,15 @@ async function initApp() {
     // Настройка слушателей событий
     setupEventListeners();
     
-    // Загрузка языка (теперь это делается в translations.js)
-    // Обновляем активные кнопки языков
+    // Настройка переключения языка
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const lang = this.getAttribute('data-lang');
+            switchLanguage(lang);
+        });
+    });
+    
+    // Загрузка сохраненного языка
     const savedLang = localStorage.getItem('language') || 'ru';
     document.querySelectorAll('.lang-btn').forEach(btn => {
         btn.classList.remove('active');
@@ -199,6 +203,7 @@ async function initApp() {
     setupBottomNavigation();
     setupOrderCreation();
     setupAdminPanel();
+    setupRequisites();
     startLiveDeals();
     
     // Загрузка данных
@@ -218,10 +223,6 @@ function setupEventListeners() {
         showToast('⚠️ Отсутствует подключение', 'Вы работаете в офлайн режиме', 'warning');
     });
 }
-
-// УДАЛИТЕ функцию switchLanguage из script.js - она теперь в translations.js
-// УДАЛИТЕ функцию applyLanguage из script.js - она теперь в translations.js
-// УДАЛИТЕ функцию updatePageTranslations из script.js - она теперь в translations.js
 
 // ============================================
 // Работа с пользователем
@@ -295,7 +296,7 @@ async function initUser() {
 async function loadUserOrders() {
     try {
         const response = await apiRequest(
-            `/api/users/${state.user.telegram_id}/orders`
+            `/users/${state.user.telegram_id}/orders`
         );
         
         state.orders = response;
@@ -354,6 +355,20 @@ function updateUserInterface() {
 // ============================================
 // Реквизиты
 // ============================================
+
+function setupRequisites() {
+    // TON кошелек
+    document.querySelector('.save-ton-wallet-btn')?.addEventListener('click', saveTonWallet);
+    document.querySelector('.edit-ton-wallet-btn')?.addEventListener('click', editTonWallet);
+    
+    // Банковская карта
+    document.querySelector('.save-card-btn')?.addEventListener('click', saveCard);
+    document.querySelector('.edit-card-btn')?.addEventListener('click', editCard);
+    
+    // Telegram
+    document.querySelector('.save-telegram-btn')?.addEventListener('click', saveTelegram);
+    document.querySelector('.edit-telegram-btn')?.addEventListener('click', editTelegram);
+}
 
 function updateRequisitesUI() {
     // TON кошелек
@@ -491,9 +506,13 @@ async function saveCard() {
 }
 
 function editCard() {
-    document.getElementById('cardNumberInput').value = state.user.requisites.card || '';
-    document.getElementById('cardBankInput').value = state.user.requisites.cardBank || '';
-    document.getElementById('cardCurrencyInput').value = state.user.requisites.cardCurrency || 'RUB';
+    const cardNumberInput = document.getElementById('cardNumberInput');
+    const cardBankInput = document.getElementById('cardBankInput');
+    const cardCurrencyInput = document.getElementById('cardCurrencyInput');
+    
+    if (cardNumberInput) cardNumberInput.value = state.user.requisites.card || '';
+    if (cardBankInput) cardBankInput.value = state.user.requisites.cardBank || '';
+    if (cardCurrencyInput) cardCurrencyInput.value = state.user.requisites.cardCurrency || 'RUB';
     
     const cardDisplay = document.getElementById('cardDisplay');
     const cardForm = document.getElementById('cardForm');
@@ -530,7 +549,10 @@ async function saveTelegram() {
 }
 
 function editTelegram() {
-    document.getElementById('telegramInput').value = state.user.requisites.telegram || '';
+    const telegramInput = document.getElementById('telegramInput');
+    if (telegramInput) {
+        telegramInput.value = state.user.requisites.telegram || '';
+    }
     
     const telegramDisplay = document.getElementById('telegramDisplay');
     const telegramForm = document.getElementById('telegramForm');
@@ -576,7 +598,8 @@ function updateProfileStats() {
                 currencyStatsElement.appendChild(currencyItem);
             });
         } else {
-            currencyStatsElement.innerHTML = `<p class="empty-text">Нет данных</p>`;
+            currencyStatsElement.innerHTML = `<p class="empty-text" data-i18n="noData">Нет данных</p>`;
+            updateTranslations(localStorage.getItem('language') || 'ru');
         }
     }
 }
@@ -640,6 +663,7 @@ function setupOrderCreation() {
     // Кнопки создания ордера
     const createOrderBtn = document.getElementById('createOrderBtn');
     const createOrderBtn2 = document.getElementById('createOrderBtn2');
+    const cancelOrderBtn = document.querySelector('.cancel-order-btn');
     
     if (createOrderBtn) {
         createOrderBtn.addEventListener('click', showCreateOrderForm);
@@ -648,6 +672,18 @@ function setupOrderCreation() {
     if (createOrderBtn2) {
         createOrderBtn2.addEventListener('click', showCreateOrderForm);
     }
+    
+    if (cancelOrderBtn) {
+        cancelOrderBtn.addEventListener('click', cancelOrderCreation);
+    }
+    
+    // Кнопки навигации по шагам
+    document.querySelectorAll('.prev-step-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const step = parseInt(this.getAttribute('data-step'));
+            previousStep(step);
+        });
+    });
     
     // Выбор типа сделки
     document.querySelectorAll('[data-type]').forEach(item => {
@@ -790,16 +826,19 @@ async function createOrder() {
     // Проверка реквизитов
     if (state.currentOrderData.payment_method === 'ton' && !state.user.requisites.tonWallet) {
         showToast('Ошибка', 'Добавьте TON кошелёк в реквизитах', 'error');
+        showPage('requisites');
         return;
     }
     
     if (state.currentOrderData.payment_method === 'card' && !state.user.requisites.card) {
         showToast('Ошибка', 'Добавьте банковскую карту в реквизитах', 'error');
+        showPage('requisites');
         return;
     }
     
     if (state.currentOrderData.payment_method === 'stars' && !state.user.requisites.telegram) {
         showToast('Ошибка', 'Добавьте Telegram в реквизитах', 'error');
+        showPage('requisites');
         return;
     }
     
@@ -837,11 +876,18 @@ async function createOrder() {
                 <div class="order-link" style="margin: 10px 0; padding: 10px; background: #f5f5f5; border-radius: 8px; word-break: break-all;">
                     ${window.location.origin}?order=${order.code}
                 </div>
-                <button class="btn btn-primary btn-full" onclick="copyOrderLink('${order.code}'); closeModal();">
+                <button class="btn btn-primary btn-full copy-order-link-btn" data-code="${order.code}">
                     <i class="fas fa-copy"></i> Скопировать ссылку
                 </button>
             </div>
         `);
+        
+        // Добавляем обработчик для кнопки копирования
+        document.querySelector('.copy-order-link-btn')?.addEventListener('click', function() {
+            const code = this.getAttribute('data-code');
+            copyOrderLink(code);
+            closeModal();
+        });
         
         // Обновляем список ордеров
         await loadUserOrders();
@@ -978,35 +1024,60 @@ function createOrderCard(order) {
         
         <div class="order-actions">
             ${order.status === 'active' ? `
-                <button class="btn btn-secondary btn-small" onclick="copyOrderLink('${order.code}')">
+                <button class="btn btn-secondary btn-small copy-link-btn" data-code="${order.code}">
                     <i class="fas fa-copy"></i> Копировать ссылку
                 </button>
                 ${isBuyer ? `
-                    <button class="btn btn-primary btn-small" onclick="confirmPayment('${order.id}')">
+                    <button class="btn btn-primary btn-small confirm-payment-btn" data-id="${order.id}">
                         <i class="fas fa-check"></i> Я оплатил
                     </button>
                 ` : ''}
                 ${isSeller && order.buyer_telegram_id ? `
-                    <button class="btn btn-success btn-small" onclick="confirmTransfer('${order.id}')">
+                    <button class="btn btn-success btn-small confirm-transfer-btn" data-id="${order.id}">
                         <i class="fas fa-exchange-alt"></i> Актив передан
                     </button>
                 ` : ''}
                 ${(state.user.role === 'admin' || state.user.role === 'worker') && !isBuyer && !isSeller ? `
-                    <button class="btn btn-warning btn-small" onclick="adminConfirmPayment('${order.id}')">
+                    <button class="btn btn-warning btn-small admin-confirm-payment-btn" data-id="${order.id}">
                         <i class="fas fa-user-shield"></i> Подтвердить оплату
                     </button>
                 ` : ''}
             ` : ''}
             ${order.status === 'paid' && isBuyer ? `
-                <button class="btn btn-success btn-small" onclick="confirmReceipt('${order.id}')">
+                <button class="btn btn-success btn-small confirm-receipt-btn" data-id="${order.id}">
                     <i class="fas fa-check-double"></i> Получил актив
                 </button>
             ` : ''}
-            <button class="btn btn-secondary btn-small" onclick="showOrderDetailsModal('${order.id}')">
+            <button class="btn btn-secondary btn-small show-details-btn" data-id="${order.id}">
                 <i class="fas fa-info-circle"></i> Подробнее
             </button>
         </div>
     `;
+    
+    // Добавляем обработчики событий
+    card.querySelector('.copy-link-btn')?.addEventListener('click', function() {
+        copyOrderLink(this.getAttribute('data-code'));
+    });
+    
+    card.querySelector('.confirm-payment-btn')?.addEventListener('click', function() {
+        confirmPayment(this.getAttribute('data-id'));
+    });
+    
+    card.querySelector('.confirm-transfer-btn')?.addEventListener('click', function() {
+        confirmTransfer(this.getAttribute('data-id'));
+    });
+    
+    card.querySelector('.admin-confirm-payment-btn')?.addEventListener('click', function() {
+        adminConfirmPayment(this.getAttribute('data-id'));
+    });
+    
+    card.querySelector('.confirm-receipt-btn')?.addEventListener('click', function() {
+        confirmReceipt(this.getAttribute('data-id'));
+    });
+    
+    card.querySelector('.show-details-btn')?.addEventListener('click', function() {
+        showOrderDetailsModal(this.getAttribute('data-id'));
+    });
     
     return card;
 }
@@ -1130,20 +1201,20 @@ function showOrderDetailsModal(orderId) {
     if (order.status === 'active') {
         if (isBuyer) {
             actionsHtml = `
-                <button class="btn btn-primary btn-full" onclick="confirmPayment('${order.id}'); closeModal();">
+                <button class="btn btn-primary btn-full confirm-payment-modal-btn" data-id="${order.id}">
                     <i class="fas fa-check"></i> Подтвердить оплату
                 </button>
             `;
         } else if (isSeller && order.buyer_telegram_id) {
             actionsHtml = `
-                <button class="btn btn-success btn-full" onclick="confirmTransfer('${order.id}'); closeModal();">
+                <button class="btn btn-success btn-full confirm-transfer-modal-btn" data-id="${order.id}">
                     <i class="fas fa-exchange-alt"></i> Подтвердить передачу актива
                 </button>
             `;
         }
     } else if (order.status === 'paid' && isBuyer) {
         actionsHtml = `
-            <button class="btn btn-success btn-full" onclick="confirmReceipt('${order.id}'); closeModal();">
+            <button class="btn btn-success btn-full confirm-receipt-modal-btn" data-id="${order.id}">
                 <i class="fas fa-check-double"></i> Подтвердить получение актива
             </button>
         `;
@@ -1162,11 +1233,32 @@ function showOrderDetailsModal(orderId) {
         </div>
         ${actionsHtml}
         <div class="modal-actions" style="margin-top: 20px;">
-            <button class="btn btn-secondary btn-full" onclick="copyOrderLink('${order.code}')">
+            <button class="btn btn-secondary btn-full copy-order-link-modal-btn" data-code="${order.code}">
                 <i class="fas fa-copy"></i> Копировать ссылку на ордер
             </button>
         </div>
     `);
+    
+    // Добавляем обработчики
+    document.querySelector('.confirm-payment-modal-btn')?.addEventListener('click', function() {
+        confirmPayment(this.getAttribute('data-id'));
+        closeModal();
+    });
+    
+    document.querySelector('.confirm-transfer-modal-btn')?.addEventListener('click', function() {
+        confirmTransfer(this.getAttribute('data-id'));
+        closeModal();
+    });
+    
+    document.querySelector('.confirm-receipt-modal-btn')?.addEventListener('click', function() {
+        confirmReceipt(this.getAttribute('data-id'));
+        closeModal();
+    });
+    
+    document.querySelector('.copy-order-link-modal-btn')?.addEventListener('click', function() {
+        copyOrderLink(this.getAttribute('data-code'));
+        closeModal();
+    });
 }
 
 // ============================================
@@ -1174,7 +1266,14 @@ function showOrderDetailsModal(orderId) {
 // ============================================
 
 function setupAdminPanel() {
-    // Кнопки админ-панели уже настроены через onclick в HTML
+    // Кнопки админ-панели
+    document.querySelector('.update-deals-btn')?.addEventListener('click', updateDealsCount);
+    document.querySelector('.add-volume-btn')?.addEventListener('click', addVolume);
+    document.querySelector('.add-worker-btn')?.addEventListener('click', addNewWorker);
+    
+    // Кнопки панели воркера
+    document.querySelector('.show-active-orders-btn')?.addEventListener('click', showActiveOrdersForWorker);
+    document.querySelector('.show-quick-completion-btn')?.addEventListener('click', showQuickCompletion);
 }
 
 async function loadAdminData() {
@@ -1257,21 +1356,30 @@ function updateAdminWorkersList(workers) {
                 </div>
                 <div style="text-align: right;">
                     <div style="font-size: 12px;">Оборот: ${totalVolume}</div>
-                    <button class="btn btn-danger btn-small" style="margin-top: 5px;" onclick="removeWorker('${worker.telegram_id}')">
+                    <button class="btn btn-danger btn-small remove-worker-btn" data-id="${worker.telegram_id}" style="margin-top: 5px;">
                         Удалить
                     </button>
                 </div>
             </div>
         `;
         
+        // Добавляем обработчик для кнопки удаления
+        workerCard.querySelector('.remove-worker-btn')?.addEventListener('click', function() {
+            removeWorker(this.getAttribute('data-id'));
+        });
+        
         workersList.appendChild(workerCard);
     });
 }
 
 function updatePlatformStats(stats) {
-    document.getElementById('totalUsers').textContent = stats.totalUsers || 0;
-    document.getElementById('totalOrders').textContent = stats.totalOrders || 0;
-    document.getElementById('platformVolume').textContent = `$${formatNumber(stats.totalVolume || 0)}`;
+    const totalUsers = document.getElementById('totalUsers');
+    const totalOrders = document.getElementById('totalOrders');
+    const platformVolume = document.getElementById('platformVolume');
+    
+    if (totalUsers) totalUsers.textContent = stats.totalUsers || 0;
+    if (totalOrders) totalOrders.textContent = stats.totalOrders || 0;
+    if (platformVolume) platformVolume.textContent = `$${formatNumber(stats.totalVolume || 0)}`;
 }
 
 async function updateDealsCount() {
@@ -1415,10 +1523,10 @@ function showActiveOrdersForWorker() {
                     </div>
                 </div>
                 <div class="order-actions">
-                    <button class="btn btn-primary btn-small" onclick="adminConfirmPayment('${order.id}'); closeModal();">
+                    <button class="btn btn-primary btn-small worker-confirm-payment-btn" data-id="${order.id}">
                         <i class="fas fa-user-shield"></i> Подтвердить оплату
                     </button>
-                    <button class="btn btn-success btn-small" onclick="fastCompleteOrder('${order.id}'); closeModal();">
+                    <button class="btn btn-success btn-small worker-fast-complete-btn" data-id="${order.id}">
                         <i class="fas fa-bolt"></i> Быстро завершить
                     </button>
                 </div>
@@ -1427,6 +1535,21 @@ function showActiveOrdersForWorker() {
     });
     
     showModal('Активные ордера для воркера', ordersHtml);
+    
+    // Добавляем обработчики
+    document.querySelectorAll('.worker-confirm-payment-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            adminConfirmPayment(this.getAttribute('data-id'));
+            closeModal();
+        });
+    });
+    
+    document.querySelectorAll('.worker-fast-complete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            fastCompleteOrder(this.getAttribute('data-id'));
+            closeModal();
+        });
+    });
 }
 
 function showQuickCompletion() {
@@ -1434,11 +1557,13 @@ function showQuickCompletion() {
         <div class="modal-info-box">
             <p>Введите код ордера для быстрого завершения:</p>
             <input type="text" id="quickCompleteOrderCode" placeholder="Код ордера" class="form-input" style="margin: 10px 0;">
-            <button class="btn btn-success btn-full" onclick="quickCompleteByCode()">
+            <button class="btn btn-success btn-full quick-complete-btn">
                 <i class="fas fa-bolt"></i> Быстро завершить
             </button>
         </div>
     `);
+    
+    document.querySelector('.quick-complete-btn')?.addEventListener('click', quickCompleteByCode);
 }
 
 async function fastCompleteOrder(orderId) {
@@ -1469,7 +1594,7 @@ async function quickCompleteByCode() {
     
     try {
         // Сначала получаем ордер по коду
-        const order = await apiRequest(`/api/orders/${code}`);
+        const order = await apiRequest(`/orders/${code}`);
         
         // Затем быстро завершаем
         await apiRequest(API_CONFIG.endpoints.fastComplete(order.id), {
@@ -1596,7 +1721,7 @@ async function checkOrderFromUrl() {
     
     if (orderCode) {
         try {
-            const order = await apiRequest(`/api/orders/${orderCode}`);
+            const order = await apiRequest(`/orders/${orderCode}`);
             
             if (order.status === 'active' && !order.buyer_telegram_id) {
                 // Предлагаем присоединиться к ордеру
@@ -1608,10 +1733,15 @@ async function checkOrderFromUrl() {
                         <p><strong>Описание:</strong> ${order.description}</p>
                         <p><strong>Продавец:</strong> ${order.seller_username}</p>
                     </div>
-                    <button class="btn btn-primary btn-full" onclick="joinOrder('${order.id}')">
+                    <button class="btn btn-primary btn-full join-order-btn" data-id="${order.id}">
                         <i class="fas fa-handshake"></i> Присоединиться к сделке
                     </button>
                 `);
+                
+                document.querySelector('.join-order-btn')?.addEventListener('click', function() {
+                    joinOrder(this.getAttribute('data-id'));
+                    closeModal();
+                });
             } else {
                 showToast('Информация', 'Этот ордер уже обрабатывается', 'info');
             }
@@ -1678,6 +1808,9 @@ function showModal(title, content) {
     modalBody.innerHTML = content;
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    
+    // Добавляем обработчик для закрытия модалки
+    document.querySelector('.close-modal-btn')?.addEventListener('click', closeModal);
 }
 
 function closeModal() {
@@ -1700,7 +1833,7 @@ function showCompletionModal(orderId) {
         </div>
         <p>Сделка успешно завершена. Средства будут переведены продавцу.</p>
         <div class="modal-actions" style="margin-top: 20px;">
-            <button class="btn btn-success btn-full" onclick="closeModal()">
+            <button class="btn btn-success btn-full close-modal-btn">
                 Отлично
             </button>
         </div>
