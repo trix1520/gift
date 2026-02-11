@@ -1,6 +1,5 @@
 // ============================================
 // GiftMarket P2P Escrow Platform
-// ИСПРАВЛЕННАЯ ВЕРСИЯ - ВСЕ РАБОТАЕТ
 // ============================================
 
 // Конфигурация API
@@ -82,7 +81,7 @@ const state = {
 };
 
 // ============================================
-// Утилиты и хелперы
+// Утилиты и хелперы - ТОЛЬКО ЗДЕСЬ
 // ============================================
 
 function formatNumber(num, decimals = 2) {
@@ -149,6 +148,8 @@ function getPaymentText(payment) {
 // Модальные окна - ИСПРАВЛЕНО
 // ============================================
 
+let activeModal = null;
+
 function showModal(title, content) {
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
@@ -156,27 +157,31 @@ function showModal(title, content) {
     
     if (!modal || !modalTitle || !modalBody) return;
     
+    // Удаляем старые обработчики
+    if (activeModal) {
+        modal.removeEventListener('click', activeModal);
+    }
+    
     modalTitle.textContent = title;
     modalBody.innerHTML = content;
     modal.classList.remove('hidden');
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
     
-    // Обработчик закрытия на кнопке
+    // Функция закрытия
+    activeModal = function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    };
+    
+    // Добавляем обработчики
+    modal.addEventListener('click', activeModal);
+    
     const closeBtn = modal.querySelector('.close-modal-btn');
     if (closeBtn) {
         closeBtn.removeEventListener('click', closeModal);
         closeBtn.addEventListener('click', closeModal);
-    }
-    
-    // Закрытие по клику вне модального окна
-    modal.removeEventListener('click', modalOutsideClick);
-    modal.addEventListener('click', modalOutsideClick);
-}
-
-function modalOutsideClick(e) {
-    if (e.target === document.getElementById('modal')) {
-        closeModal();
     }
 }
 
@@ -189,6 +194,11 @@ function closeModal() {
         
         const modalBody = document.getElementById('modalBody');
         if (modalBody) modalBody.innerHTML = '';
+        
+        if (activeModal) {
+            modal.removeEventListener('click', activeModal);
+            activeModal = null;
+        }
     }
 }
 
@@ -197,6 +207,7 @@ function closeModal() {
 // ============================================
 
 let toastCounter = 0;
+const activeToasts = new Set();
 
 function showToast(title, message, type = 'info') {
     const toastContainer = document.getElementById('toastContainer');
@@ -213,15 +224,17 @@ function showToast(title, message, type = 'info') {
     `;
     
     toastContainer.appendChild(toast);
+    activeToasts.add(toastId);
     
     setTimeout(() => {
         const toastElement = document.getElementById(toastId);
-        if (toastElement) {
+        if (toastElement && activeToasts.has(toastId)) {
             toastElement.style.opacity = '0';
             toastElement.style.transform = 'translateX(100px)';
             setTimeout(() => {
                 if (toastElement.parentNode) {
                     toastElement.parentNode.removeChild(toastElement);
+                    activeToasts.delete(toastId);
                 }
             }, 300);
         }
@@ -257,17 +270,17 @@ function showPage(pageName) {
     document.dispatchEvent(new CustomEvent('pageChanged', { detail: { page: pageName } }));
 }
 
+function navClickHandler(e) {
+    const page = e.currentTarget.getAttribute('data-page');
+    showPage(page);
+}
+
 function setupBottomNavigation() {
     const navItems = document.querySelectorAll('.bottom-nav-item');
     navItems.forEach(item => {
         item.removeEventListener('click', navClickHandler);
         item.addEventListener('click', navClickHandler);
     });
-}
-
-function navClickHandler() {
-    const page = this.getAttribute('data-page');
-    showPage(page);
 }
 
 // ============================================
@@ -315,6 +328,122 @@ async function apiRequest(endpoint, options = {}) {
         throw error;
     } finally {
         hideLoader();
+    }
+}
+
+// ============================================
+// Инициализация пользователя
+// ============================================
+
+async function initUser() {
+    try {
+        let telegramId = localStorage.getItem('telegram_id');
+        const isNewUser = !telegramId;
+        
+        if (!telegramId) {
+            telegramId = generateNumericId();
+            localStorage.setItem('telegram_id', telegramId);
+            localStorage.setItem('user_created', new Date().toISOString());
+        }
+        
+        const userData = await apiRequest(API_CONFIG.endpoints.users, {
+            method: 'POST',
+            body: JSON.stringify({
+                username: telegramId,
+                telegram_id: telegramId
+            })
+        });
+        
+        state.user = {
+            id: userData.id,
+            telegram_id: userData.telegram_id,
+            username: userData.username || userData.telegram_id,
+            role: userData.role || 'user',
+            isAdmin: userData.isAdmin || false,
+            isWorker: userData.isWorker || false,
+            requisites: {
+                tonWallet: userData.ton_wallet,
+                card: userData.card_number,
+                cardBank: userData.card_bank,
+                cardCurrency: userData.card_currency,
+                telegram: userData.telegram_username
+            },
+            stats: {
+                completedDeals: userData.completed_deals || 0,
+                volumes: userData.volumes || {}
+            }
+        };
+        
+        updateUserInterface();
+        await loadUserOrders();
+        
+        if (isNewUser) {
+            showToast('🎉 Добро пожаловать!', `Ваш ID: ${telegramId}`, 'info');
+        }
+        
+        if (state.user.role === 'admin') {
+            showToast('👑 Администратор', 'Доступна панель администратора', 'success');
+            setTimeout(() => loadAdminData(), 1000);
+        } else if (state.user.role === 'worker') {
+            showToast('🛠️ Воркер', 'Доступны функции воркера', 'success');
+        }
+        
+    } catch (error) {
+        console.error('Ошибка инициализации пользователя:', error);
+        
+        state.user.telegram_id = localStorage.getItem('telegram_id') || generateNumericId();
+        state.user.username = state.user.telegram_id;
+        updateUserInterface();
+    }
+}
+
+function updateUserInterface() {
+    const userTelegramIdElement = document.getElementById('userTelegramId');
+    if (userTelegramIdElement) {
+        userTelegramIdElement.textContent = `ID: ${state.user.telegram_id}`;
+    }
+    
+    const userNameElement = document.getElementById('userName');
+    if (userNameElement) {
+        userNameElement.textContent = state.user.username || state.user.telegram_id;
+    }
+    
+    const roleBadge = document.querySelector('.role-badge');
+    if (roleBadge) {
+        roleBadge.className = `role-badge ${state.user.role}`;
+        roleBadge.textContent = state.user.role === 'admin' ? 'Администратор' : 
+                               state.user.role === 'worker' ? 'Воркер' : 'Пользователь';
+    }
+    
+    updateRequisitesUI();
+    updateProfileStats();
+    
+    const adminPanel = document.getElementById('adminPanel');
+    const workerPanel = document.getElementById('workerPanel');
+    
+    if (adminPanel && workerPanel) {
+        if (state.user.role === 'admin') {
+            adminPanel.classList.remove('hidden');
+            workerPanel.classList.add('hidden');
+        } else if (state.user.role === 'worker') {
+            adminPanel.classList.add('hidden');
+            workerPanel.classList.remove('hidden');
+        } else {
+            adminPanel.classList.add('hidden');
+            workerPanel.classList.add('hidden');
+        }
+    }
+}
+
+async function loadUserOrders() {
+    try {
+        const response = await apiRequest(`/users/${state.user.telegram_id}/orders`);
+        state.orders = response;
+        updateOrdersList();
+    } catch (error) {
+        console.error('Ошибка загрузки ордеров:', error);
+        state.orders = [];
+        updateOrdersList();
     }
 }
 
@@ -408,7 +537,6 @@ function updateRequisitesUI() {
 }
 
 function setupRequisites() {
-    // Имя пользователя
     const saveUserNameBtn = document.querySelector('.save-user-name-btn');
     if (saveUserNameBtn) {
         saveUserNameBtn.removeEventListener('click', saveUserName);
@@ -421,7 +549,6 @@ function setupRequisites() {
         editUserNameBtn.addEventListener('click', editUserName);
     }
     
-    // TON кошелек
     const saveTonWalletBtn = document.querySelector('.save-ton-wallet-btn');
     if (saveTonWalletBtn) {
         saveTonWalletBtn.removeEventListener('click', saveTonWallet);
@@ -434,7 +561,6 @@ function setupRequisites() {
         editTonWalletBtn.addEventListener('click', editTonWallet);
     }
     
-    // Банковская карта
     const saveCardBtn = document.querySelector('.save-card-btn');
     if (saveCardBtn) {
         saveCardBtn.removeEventListener('click', saveCard);
@@ -447,7 +573,6 @@ function setupRequisites() {
         editCardBtn.addEventListener('click', editCard);
     }
     
-    // Telegram
     const saveTelegramBtn = document.querySelector('.save-telegram-btn');
     if (saveTelegramBtn) {
         saveTelegramBtn.removeEventListener('click', saveTelegram);
@@ -631,6 +756,43 @@ function editTelegram() {
     if (telegramDisplay && telegramForm) {
         telegramDisplay.classList.add('hidden');
         telegramForm.classList.remove('hidden');
+    }
+}
+
+function updateProfileStats() {
+    const completedDealsElement = document.getElementById('completedDeals');
+    if (completedDealsElement) {
+        completedDealsElement.textContent = state.user.stats.completedDeals;
+    }
+    
+    const totalVolumeElement = document.getElementById('totalVolume');
+    if (totalVolumeElement) {
+        let totalUSD = 0;
+        if (state.user.stats.volumes) {
+            Object.entries(state.user.stats.volumes).forEach(([currency, amount]) => {
+                totalUSD += convertToUSD(amount, currency);
+            });
+        }
+        totalVolumeElement.textContent = `$${formatNumber(totalUSD)}`;
+    }
+    
+    const currencyStatsElement = document.getElementById('currencyStats');
+    if (currencyStatsElement) {
+        if (state.user.stats.volumes && Object.keys(state.user.stats.volumes).length > 0) {
+            currencyStatsElement.innerHTML = '';
+            
+            Object.entries(state.user.stats.volumes).forEach(([currency, amount]) => {
+                const currencyItem = document.createElement('div');
+                currencyItem.className = 'currency-item';
+                currencyItem.innerHTML = `
+                    <span class="currency-name">${currency}</span>
+                    <span class="currency-amount">${formatCurrency(amount, currency)}</span>
+                `;
+                currencyStatsElement.appendChild(currencyItem);
+            });
+        } else {
+            currencyStatsElement.innerHTML = '<p class="empty-text">Нет данных</p>';
+        }
     }
 }
 
@@ -1063,160 +1225,7 @@ async function fakePayment(orderId) {
 }
 
 // ============================================
-// Инициализация пользователя
-// ============================================
-
-async function initUser() {
-    try {
-        let telegramId = localStorage.getItem('telegram_id');
-        const isNewUser = !telegramId;
-        
-        if (!telegramId) {
-            telegramId = generateNumericId();
-            localStorage.setItem('telegram_id', telegramId);
-            localStorage.setItem('user_created', new Date().toISOString());
-        }
-        
-        const userData = await apiRequest(API_CONFIG.endpoints.users, {
-            method: 'POST',
-            body: JSON.stringify({
-                username: telegramId,
-                telegram_id: telegramId
-            })
-        });
-        
-        state.user = {
-            id: userData.id,
-            telegram_id: userData.telegram_id,
-            username: userData.username || userData.telegram_id,
-            role: userData.role || 'user',
-            isAdmin: userData.isAdmin || false,
-            isWorker: userData.isWorker || false,
-            requisites: {
-                tonWallet: userData.ton_wallet,
-                card: userData.card_number,
-                cardBank: userData.card_bank,
-                cardCurrency: userData.card_currency,
-                telegram: userData.telegram_username
-            },
-            stats: {
-                completedDeals: userData.completed_deals || 0,
-                volumes: userData.volumes || {}
-            }
-        };
-        
-        updateUserInterface();
-        await loadUserOrders();
-        
-        if (isNewUser) {
-            showToast('🎉 Добро пожаловать!', `Ваш ID: ${telegramId}`, 'info');
-        }
-        
-        if (state.user.role === 'admin') {
-            showToast('👑 Администратор', 'Доступна панель администратора', 'success');
-            setTimeout(() => loadAdminData(), 1000);
-        } else if (state.user.role === 'worker') {
-            showToast('🛠️ Воркер', 'Доступны функции воркера', 'success');
-        }
-        
-    } catch (error) {
-        console.error('Ошибка инициализации пользователя:', error);
-        
-        state.user.telegram_id = localStorage.getItem('telegram_id') || generateNumericId();
-        state.user.username = state.user.telegram_id;
-        updateUserInterface();
-    }
-}
-
-function updateUserInterface() {
-    const userTelegramIdElement = document.getElementById('userTelegramId');
-    if (userTelegramIdElement) {
-        userTelegramIdElement.textContent = `ID: ${state.user.telegram_id}`;
-    }
-    
-    const userNameElement = document.getElementById('userName');
-    if (userNameElement) {
-        userNameElement.textContent = state.user.username || state.user.telegram_id;
-    }
-    
-    const roleBadge = document.querySelector('.role-badge');
-    if (roleBadge) {
-        roleBadge.className = `role-badge ${state.user.role}`;
-        roleBadge.textContent = state.user.role === 'admin' ? 'Администратор' : 
-                               state.user.role === 'worker' ? 'Воркер' : 'Пользователь';
-    }
-    
-    updateRequisitesUI();
-    updateProfileStats();
-    
-    const adminPanel = document.getElementById('adminPanel');
-    const workerPanel = document.getElementById('workerPanel');
-    
-    if (adminPanel && workerPanel) {
-        if (state.user.role === 'admin') {
-            adminPanel.classList.remove('hidden');
-            workerPanel.classList.add('hidden');
-        } else if (state.user.role === 'worker') {
-            adminPanel.classList.add('hidden');
-            workerPanel.classList.remove('hidden');
-        } else {
-            adminPanel.classList.add('hidden');
-            workerPanel.classList.add('hidden');
-        }
-    }
-}
-
-function updateProfileStats() {
-    const completedDealsElement = document.getElementById('completedDeals');
-    if (completedDealsElement) {
-        completedDealsElement.textContent = state.user.stats.completedDeals;
-    }
-    
-    const totalVolumeElement = document.getElementById('totalVolume');
-    if (totalVolumeElement) {
-        let totalUSD = 0;
-        if (state.user.stats.volumes) {
-            Object.entries(state.user.stats.volumes).forEach(([currency, amount]) => {
-                totalUSD += convertToUSD(amount, currency);
-            });
-        }
-        totalVolumeElement.textContent = `$${formatNumber(totalUSD)}`;
-    }
-    
-    const currencyStatsElement = document.getElementById('currencyStats');
-    if (currencyStatsElement) {
-        if (state.user.stats.volumes && Object.keys(state.user.stats.volumes).length > 0) {
-            currencyStatsElement.innerHTML = '';
-            
-            Object.entries(state.user.stats.volumes).forEach(([currency, amount]) => {
-                const currencyItem = document.createElement('div');
-                currencyItem.className = 'currency-item';
-                currencyItem.innerHTML = `
-                    <span class="currency-name">${currency}</span>
-                    <span class="currency-amount">${formatCurrency(amount, currency)}</span>
-                `;
-                currencyStatsElement.appendChild(currencyItem);
-            });
-        } else {
-            currencyStatsElement.innerHTML = '<p class="empty-text">Нет данных</p>';
-        }
-    }
-}
-
-async function loadUserOrders() {
-    try {
-        const response = await apiRequest(`/users/${state.user.telegram_id}/orders`);
-        state.orders = response;
-        updateOrdersList();
-    } catch (error) {
-        console.error('Ошибка загрузки ордеров:', error);
-        state.orders = [];
-        updateOrdersList();
-    }
-}
-
-// ============================================
-// Ордера
+// Ордера - ТОЛЬКО ЗДЕСЬ
 // ============================================
 
 function updateOrdersList() {
@@ -1704,22 +1713,22 @@ function setupOrderCreation() {
     }
 }
 
-function prevStepHandler() {
-    const step = parseInt(this.getAttribute('data-step'));
+function prevStepHandler(e) {
+    const step = parseInt(e.currentTarget.getAttribute('data-step'));
     previousStep(step);
 }
 
-function typeSelectHandler() {
+function typeSelectHandler(e) {
     document.querySelectorAll('[data-type]').forEach(i => i.classList.remove('selected'));
-    this.classList.add('selected');
-    state.currentOrderData.type = this.getAttribute('data-type');
+    e.currentTarget.classList.add('selected');
+    state.currentOrderData.type = e.currentTarget.getAttribute('data-type');
     nextStep(2);
 }
 
-function paymentSelectHandler() {
+function paymentSelectHandler(e) {
     document.querySelectorAll('[data-payment]').forEach(i => i.classList.remove('selected'));
-    this.classList.add('selected');
-    state.currentOrderData.payment_method = this.getAttribute('data-payment');
+    e.currentTarget.classList.add('selected');
+    state.currentOrderData.payment_method = e.currentTarget.getAttribute('data-payment');
     updateCurrencyDisplay();
     nextStep(3);
 }
@@ -2285,8 +2294,17 @@ function fixScrolling() {
 }
 
 // ============================================
-// Инициализация приложения
+// Обработчики событий
 // ============================================
+
+function onlineHandler() {
+    showToast('✅ Восстановлено подключение', 'Синхронизация данных...', 'success');
+    setTimeout(initUser, 1000);
+}
+
+function offlineHandler() {
+    showToast('⚠️ Отсутствует подключение', 'Вы работаете в офлайн режиме', 'warning');
+}
 
 function setupEventListeners() {
     window.removeEventListener('online', onlineHandler);
@@ -2296,13 +2314,11 @@ function setupEventListeners() {
     window.addEventListener('offline', offlineHandler);
 }
 
-function onlineHandler() {
-    showToast('✅ Восстановлено подключение', 'Синхронизация данных...', 'success');
-    setTimeout(initUser, 1000);
-}
-
-function offlineHandler() {
-    showToast('⚠️ Отсутствует подключение', 'Вы работаете в офлайн режиме', 'warning');
+function langClickHandler(e) {
+    const lang = e.currentTarget.getAttribute('data-lang');
+    if (window.switchLanguage) {
+        window.switchLanguage(lang);
+    }
 }
 
 function setupLanguage() {
@@ -2322,12 +2338,9 @@ function setupLanguage() {
     document.documentElement.lang = savedLang === 'ru' ? 'ru' : 'en';
 }
 
-function langClickHandler() {
-    const lang = this.getAttribute('data-lang');
-    if (window.switchLanguage) {
-        window.switchLanguage(lang);
-    }
-}
+// ============================================
+// Инициализация приложения
+// ============================================
 
 async function initApp() {
     console.log('🚀 GiftMarket инициализация...');
