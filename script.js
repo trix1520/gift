@@ -2173,6 +2173,90 @@ function showCompletionModal(orderId) {
 }
 
 // ============================================
+// Исправление: функция showPage
+// ============================================
+function showPage(pageName) {
+    // Скрываем все страницы
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    // Показываем выбранную страницу
+    const targetPage = document.getElementById('page-' + pageName);
+    if (targetPage) {
+        targetPage.classList.add('active');
+        
+        // Плавный скролл наверх
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+    
+    // Обновляем активное состояние навигации
+    document.querySelectorAll('.bottom-nav-item').forEach(nav => {
+        nav.classList.remove('active');
+        if (nav.getAttribute('data-page') === pageName) {
+            nav.classList.add('active');
+        }
+    });
+    
+    // Триггерим событие смены страницы
+    document.dispatchEvent(new CustomEvent('pageChanged', { detail: { page: pageName } }));
+}
+
+// ============================================
+// Исправление: функция closeModal
+// ============================================
+function closeModal() {
+    const modal = document.getElementById('modal');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        
+        // Очищаем содержимое модального окна
+        const modalBody = document.getElementById('modalBody');
+        if (modalBody) modalBody.innerHTML = '';
+    }
+}
+
+// ============================================
+// Исправление: функция showModal
+// ============================================
+function showModal(title, content) {
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    
+    if (!modal || !modalTitle || !modalBody) return;
+    
+    modalTitle.textContent = title;
+    modalBody.innerHTML = content;
+    modal.classList.remove('hidden');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Добавляем обработчики закрытия
+    const closeBtn = document.querySelector('.close-modal-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeModal);
+    }
+    
+    // Закрытие по клику вне модального окна
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+}
+
+// Переопределяем существующие функции
+window.showPage = showPage;
+window.closeModal = closeModal;
+window.showModal = showModal;
+
+// ============================================
 // Инициализация
 // ============================================
 
